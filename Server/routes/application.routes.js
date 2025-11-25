@@ -1,9 +1,10 @@
 import express from 'express';
 import Application from '../models/Application.model.js';
-import Loan from '../models/Loan.model.js';
 import { protect } from '../middleware/auth.middleware.js';
 import { uploadMultiple } from '../utils/upload.js';
 import { sendEmail } from '../utils/sendEmail.js';
+import mongoose from 'mongoose';
+import Loan from '../models/Loan.model.js';
 
 const router = express.Router();
 
@@ -16,146 +17,110 @@ router.post('/', protect, uploadMultiple, async (req, res) => {
     const applicationData = req.body;
 
     // Parse JSON fields if they're strings
-    if (typeof applicationData.personalInfo === 'string') {
-      applicationData.personalInfo = JSON.parse(applicationData.personalInfo);
-    }
-    if (typeof applicationData.address === 'string') {
-      applicationData.address = JSON.parse(applicationData.address);
-    }
-    if (typeof applicationData.employmentInfo === 'string') {
-      applicationData.employmentInfo = JSON.parse(applicationData.employmentInfo);
-    }
-    if (typeof applicationData.loanDetails === 'string') {
-      applicationData.loanDetails = JSON.parse(applicationData.loanDetails);
+    ['personalInfo','address','employmentInfo','loanDetails'].forEach(f => {
+      if (typeof applicationData[f] === 'string') {
+        try { applicationData[f] = JSON.parse(applicationData[f]); } catch { /* ignore */ }
+      }
+    });
+
+    // Accept loanId or loanProductId
+    const loanId = applicationData.loanId || applicationData.loanProductId;
+    if (!loanId || !mongoose.Types.ObjectId.isValid(loanId)) {
+      return res.status(400).json({ success: false, message: 'Valid loanId required' });
     }
 
-    // Get loan details
-    const loan = await Loan.findById(applicationData.loanId);
+    const loan = await Loan.findById(loanId);
     if (!loan) {
-      return res.status(404).json({
-        success: false,
-        message: 'Loan not found'
-      });
+      return res.status(404).json({ success: false, message: 'Loan not found' });
     }
+
+    // Normalize loanDetails field names from frontend:
+    // principal -> loanAmount, tenureMonths -> loanTenure
+    const ld = applicationData.loanDetails || {};
+    const loanAmount = Number(ld.loanAmount ?? ld.principal);
+    const loanTenure = Number(ld.loanTenure ?? ld.tenureMonths);
+    if (!Number.isFinite(loanAmount) || loanAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'loanAmount invalid' });
+    }
+    if (!Number.isFinite(loanTenure) || loanTenure <= 0) {
+      return res.status(400).json({ success: false, message: 'loanTenure invalid' });
+    }
+
+    const annualRate = loan.interestRate?.default ?? loan.interestRate?.min ?? 0;
+    const monthlyRate = annualRate / 100 / 12;
+    const emi = monthlyRate > 0
+      ? Math.round(
+          (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, loanTenure)) /
+          (Math.pow(1 + monthlyRate, loanTenure) - 1)
+        )
+      : 0;
 
     // Prepare documents array
     const documents = [];
-    
-    if (files.idProof) {
-      files.idProof.forEach(file => {
+    const pushGroup = (arr, type) => {
+      (arr || []).forEach(file => {
         documents.push({
-          type: 'ID',
+          type,
           name: file.originalname,
           url: `/uploads/${file.filename}`,
           status: 'Pending'
         });
       });
-    }
-    
-    if (files.addressProof) {
-      files.addressProof.forEach(file => {
-        documents.push({
-          type: 'Address',
-          name: file.originalname,
-          url: `/uploads/${file.filename}`,
-          status: 'Pending'
-        });
-      });
-    }
-    
-    if (files.incomeProof) {
-      files.incomeProof.forEach(file => {
-        documents.push({
-          type: 'Income',
-          name: file.originalname,
-          url: `/uploads/${file.filename}`,
-          status: 'Pending'
-        });
-      });
-    }
-    
-    if (files.bankStatement) {
-      files.bankStatement.forEach(file => {
-        documents.push({
-          type: 'Bank Statement',
-          name: file.originalname,
-          url: `/uploads/${file.filename}`,
-          status: 'Pending'
-        });
-      });
-    }
-    
-    if (files.otherDocuments) {
-      files.otherDocuments.forEach(file => {
-        documents.push({
-          type: 'Other',
-          name: file.originalname,
-          url: `/uploads/${file.filename}`,
-          status: 'Pending'
-        });
-      });
-    }
+    };
+    pushGroup(files.idProof, 'ID');
+    pushGroup(files.addressProof, 'Address');
+    pushGroup(files.incomeProof, 'Income');
+    pushGroup(files.bankStatement, 'Bank Statement');
+    pushGroup(files.otherDocuments, 'Other');
 
     // Create application
     const application = await Application.create({
       userId: req.user._id,
-      loanId: applicationData.loanId,
+      loanId: loan._id,
       loanType: loan.type,
       personalInfo: applicationData.personalInfo,
       address: applicationData.address,
       employmentInfo: applicationData.employmentInfo,
       loanDetails: {
-        ...applicationData.loanDetails,
-        interestRate: loan.interestRate.default,
-        emi: calculateEMI(
-          applicationData.loanDetails.loanAmount,
-          loan.interestRate.default,
-          applicationData.loanDetails.loanTenure
-        )
+        loanAmount,
+        loanTenure,
+        interestRate: annualRate,
+        emi
       },
       documents,
       status: 'Submitted'
     });
 
-    // Send confirmation email
+    // Send confirmation email (fix signature)
     const emailHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #333;">Loan Application Submitted</h2>
-        <p style="color: #666;">Dear ${applicationData.personalInfo.fullName},</p>
-        <p style="color: #666;">Your loan application has been submitted successfully.</p>
-        <p style="color: #666;"><strong>Application Number:</strong> ${application.applicationNumber}</p>
-        <p style="color: #666;"><strong>Loan Type:</strong> ${loan.type}</p>
-        <p style="color: #666;"><strong>Loan Amount:</strong> ₹${applicationData.loanDetails.loanAmount.toLocaleString()}</p>
-        <p style="color: #666;">We will review your application and get back to you soon.</p>
-      </div>
-    `;
+      <div style="font-family: Arial, sans-serif; max-width:600px;margin:0 auto;padding:20px;">
+        <h2 style="color:#333;">Loan Application Submitted</h2>
+        <p style="color:#666;">Dear ${applicationData.personalInfo?.fullName || 'Applicant'},</p>
+        <p style="color:#666;">Your loan application has been submitted successfully.</p>
+        <p style="color:#666;"><strong>Application Number:</strong> ${application.applicationNumber}</p>
+        <p style="color:#666;"><strong>Loan Type:</strong> ${loan.type}</p>
+        <p style="color:#666;"><strong>Loan Amount:</strong> ₹${loanAmount.toLocaleString()}</p>
+        <p style="color:#666;">We will review your application and get back to you soon.</p>
+      </div>`;
+    await sendEmail({
+      to: applicationData.personalInfo?.email,
+      subject: 'Loan Application Submitted',
+      html: emailHtml,
+      text: 'Your loan application has been submitted.'
+    });
 
-    await sendEmail(
-      applicationData.personalInfo.email,
-      'Loan Application Submitted',
-      emailHtml
-    );
-
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Application submitted successfully',
       data: application
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message || 'Server error'
     });
   }
 });
-
-// Helper function to calculate EMI
-function calculateEMI(principal, annualRate, tenureMonths) {
-  const monthlyRate = annualRate / 100 / 12;
-  const emi = (principal * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)) /
-    (Math.pow(1 + monthlyRate, tenureMonths) - 1);
-  return Math.round(emi);
-}
 
 // @route   GET /api/applications
 // @desc    Get user's applications
@@ -381,6 +346,14 @@ router.post('/:id/reject', protect, async (req, res) => {
     });
   }
 });
+
+// Validation helper
+function validateObjectId(id, field) {
+  if (!id) throw new Error(`${field} is required`);
+  if (id === '') throw new Error(`${field} cannot be empty string`);
+  if (!mongoose.Types.ObjectId.isValid(id)) throw new Error(`${field} is not a valid ObjectId`);
+  return id;
+}
 
 export default router;
 

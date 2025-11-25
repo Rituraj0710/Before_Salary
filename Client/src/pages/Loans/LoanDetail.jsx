@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../utils/api';
 import { CheckCircleIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
@@ -7,8 +7,15 @@ import { CheckCircleIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 const LoanDetail = () => {
   const { slug } = useParams();
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [loan, setLoan] = useState(null);
   const [loading, setLoading] = useState(true);
+  // New state for application form
+  const [principal, setPrincipal] = useState('');
+  const [tenure, setTenure] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [applyError, setApplyError] = useState(null);
+  const [applySuccess, setApplySuccess] = useState(null);
 
   useEffect(() => {
     fetchLoan();
@@ -22,6 +29,71 @@ const LoanDetail = () => {
       console.error('Error fetching loan:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Helper EMI calc
+  const annualRate = loan?.interestRate?.min || 0;
+  const emiPreview = (() => {
+    const P = Number(principal);
+    const n = Number(tenure);
+    const r = (annualRate / 12) / 100;
+    if (P > 0 && n > 0 && r > 0) {
+      const pow = Math.pow(1 + r, n);
+      const emi = P * r * pow / (pow - 1);
+      return Number.isFinite(emi) ? emi.toFixed(2) : null;
+    }
+    return null;
+  })();
+
+  const handleApply = async () => {
+    setApplyError(null);
+    setApplySuccess(null);
+    if (!isAuthenticated) { navigate('/login'); return; }
+
+    const loanAmount = Number(principal);
+    const loanTenure = Number(tenure);
+    if (!(loanAmount > 0)) { setApplyError('Enter valid principal'); return; }
+    if (!(loanTenure > 0)) { setApplyError('Enter valid tenure'); return; }
+
+    // Range checks against loan product
+    if (loan.minLoanAmount && loanAmount < loan.minLoanAmount) {
+      setApplyError(`Principal must be ≥ ₹${loan.minLoanAmount}`); return;
+    }
+    if (loan.maxLoanAmount && loanAmount > loan.maxLoanAmount) {
+      setApplyError(`Principal must be ≤ ₹${loan.maxLoanAmount}`); return;
+    }
+    if (loan.minTenure && loanTenure < loan.minTenure) {
+      setApplyError(`Tenure must be ≥ ${loan.minTenure} months`); return;
+    }
+    if (loan.maxTenure && loanTenure > loan.maxTenure) {
+      setApplyError(`Tenure must be ≤ ${loan.maxTenure} months`); return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        loanId: loan._id,           // match backend expectation
+        loanDetails: {
+          loanAmount,
+          loanTenure
+          // no emi: backend computes
+        },
+        personalInfo: {
+          // optionally include available data if required by backend form
+          fullName: loan?.applicantName, // remove or replace as needed
+        }
+      };
+      const res = await api.post('/applications', payload);
+      if (res.data.success) {
+        setApplySuccess('Application submitted successfully.');
+      } else {
+        setApplyError(res.data.message || 'Submission failed');
+      }
+    } catch (e) {
+      setApplyError(e.response?.data?.message || e.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -74,13 +146,63 @@ const LoanDetail = () => {
             </div>
           </div>
 
-          <Link
-            to="/eligibility"
-            className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition inline-flex items-center"
-          >
-            Apply Now
-            <ArrowRightIcon className="ml-2 h-5 w-5" />
-          </Link>
+          {/* Application Form */}
+          <div className="mt-8 border-t pt-6">
+            <h2 className="text-2xl font-semibold mb-4">Apply for this Loan</h2>
+            <div className="grid md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Principal (₹)</label>
+                <input
+                  type="number"
+                  value={principal}
+                  onChange={e => setPrincipal(e.target.value)}
+                  className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. 500000"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tenure (Months)</label>
+                <input
+                  type="number"
+                  value={tenure}
+                  onChange={e => setTenure(e.target.value)}
+                  className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g. 36"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Interest Rate (Annual %)</label>
+                <input
+                  type="text"
+                  value={annualRate}
+                  disabled
+                  className="w-full border rounded px-3 py-2 bg-gray-100 text-gray-700"
+                />
+              </div>
+            </div>
+            <div className="mt-4">
+              <p className="text-sm text-gray-600">
+                EMI Preview: {emiPreview ? <span className="font-semibold">₹{Number(emiPreview).toLocaleString()}</span> : 'Enter values to calculate'}
+              </p>
+            </div>
+            {applyError && (
+              <p className="mt-4 text-sm text-red-600">{applyError}</p>
+            )}
+            {applySuccess && (
+              <p className="mt-4 text-sm text-green-600">{applySuccess}</p>
+            )}
+            <button
+              onClick={handleApply}
+              disabled={submitting}
+              className="mt-6 bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 inline-flex items-center"
+            >
+              {submitting ? 'Submitting...' : 'Submit Application'}
+              <ArrowRightIcon className="ml-2 h-5 w-5" />
+            </button>
+            {!isAuthenticated && (
+              <p className="mt-2 text-xs text-gray-500">You will be redirected to login.</p>
+            )}
+          </div>
         </div>
 
         {/* Features */}
