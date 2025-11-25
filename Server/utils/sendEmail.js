@@ -1,96 +1,120 @@
 import nodemailer from 'nodemailer';
 
-// Validate email configuration
-const validateEmailConfig = () => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.warn('⚠️  EMAIL_USER or EMAIL_PASS not set in environment variables!');
-    console.warn('⚠️  Emails will not be sent. Please configure your .env file.');
-    return false;
-  }
-  return true;
-};
+let transporter;
+let verified = false;
 
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: process.env.EMAIL_PORT || 587,
-  secure: false, // true for 465, false for other ports
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
+function classifyError(err) {
+  if (!err) return { suggestions: [] };
+  const s = [];
+  if (err.code === 'EAUTH') {
+    s.push('Invalid EMAIL_USER or EMAIL_PASS');
+    s.push('If Gmail: create 16-char App Password (account > Security)');
   }
-});
-
-// Verify transporter configuration
-if (validateEmailConfig()) {
-  transporter.verify(function (error, success) {
-    if (error) {
-      console.error('❌ Email transporter verification failed:', error.message);
-      console.error('📧 Please check your EMAIL_USER and EMAIL_PASS in .env file');
-      console.error('📧 For Gmail, you need to use an App Password, not your regular password');
-    } else {
-      console.log('✅ Email transporter is ready to send emails');
-    }
-  });
+  if (err.code === 'ECONNECTION') {
+    s.push('Check EMAIL_HOST / EMAIL_PORT reachability');
+    s.push('Firewall or network block possible');
+  }
+  if (/self signed certificate/i.test(err.message || '')) {
+    s.push('Provide a valid TLS cert or use a trusted SMTP host');
+  }
+  if (/ETIMEDOUT/i.test(err.message || '')) {
+    s.push('Port/security mismatch (try 587 STARTTLS or 465 secure)');
+  }
+  return { suggestions: s };
 }
 
-export const sendEmail = async (to, subject, html) => {
-  // Check if email is configured
-  if (!validateEmailConfig()) {
-    return { 
-      success: false, 
-      error: 'Email configuration missing. Please set EMAIL_USER and EMAIL_PASS in .env file' 
+function buildTransport() {
+  if (transporter) return transporter;
+  const { EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS } = process.env;
+  transporter = nodemailer.createTransport({
+    host: EMAIL_HOST,
+    port: Number(EMAIL_PORT) || 587,
+    secure: Number(EMAIL_PORT) === 465,
+    auth: { user: EMAIL_USER, pass: EMAIL_PASS },
+    logger: process.env.SMTP_DEBUG === 'true',
+    debug: process.env.SMTP_DEBUG === 'true'
+  });
+  return transporter;
+}
+
+export async function verifySMTP() {
+  const required = ['EMAIL_HOST','EMAIL_PORT','EMAIL_USER','EMAIL_PASS'];
+  const missing = required.filter(k => !process.env[k]);
+  const empty = required.filter(k => process.env[k] === '');
+  if (missing.length || empty.length) {
+    return {
+      success: false,
+      error: 'Missing/empty: ' + [...missing, ...empty].join(', ')
     };
   }
-
   try {
-    const mailOptions = {
-      from: `"BeforeSalary" <${process.env.EMAIL_USER}>`,
+    await buildTransport().verify();
+    verified = true;
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message, code: err.code };
+  }
+}
+
+function preflight() {
+  const required = ['EMAIL_HOST','EMAIL_PORT','EMAIL_USER','EMAIL_PASS'];
+  const missing = required.filter(k => !process.env[k]);
+  const empty = required.filter(k => process.env[k] === '');
+  const host = process.env.EMAIL_HOST || '';
+  let gmailHint = null;
+  if (/gmail\.com$/i.test(host) && (process.env.EMAIL_PASS || '').length < 16) {
+    gmailHint = 'Gmail requires a 16-char App Password (not your login password).';
+  }
+  return { ok: !missing.length && !empty.length, missing, empty, gmailHint };
+}
+
+export async function sendEmail({ to, subject, html, text }) {
+  const pf = preflight();
+  if (!pf.ok) {
+    return {
+      success: false,
+      error: 'SMTP config incomplete',
+      code: 'ENV_MISSING',
+      missing: pf.missing,
+      empty: pf.empty,
+      ...(pf.gmailHint && { gmailHint: pf.gmailHint })
+    };
+  }
+  try {
+    const info = await buildTransport().sendMail({
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
       to,
       subject,
-      html
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email sent successfully to:', to);
-    console.log('📧 Message ID:', info.messageId);
+      html,
+      text
+    });
     return { success: true, messageId: info.messageId };
-  } catch (error) {
-    console.error('❌ Email sending error:', error.message);
-    if (error.code === 'EAUTH') {
-      console.error('🔐 Authentication failed. Please check your EMAIL_USER and EMAIL_PASS');
-      console.error('📧 For Gmail: Use an App Password, not your regular password');
-      return { 
-        success: false, 
-        error: 'Email authentication failed. Please check your email credentials.' 
-      };
-    }
-    return { success: false, error: error.message };
+  } catch (err) {
+    const { suggestions } = classifyError(err);
+    return {
+      success: false,
+      error: err.message,
+      code: err.code,
+      suggestions,
+      diagnostic: {
+        command: err.command,
+        response: err.response,
+        host: process.env.EMAIL_HOST,
+        port: process.env.EMAIL_PORT
+      }
+    };
   }
-};
+}
 
-export const sendOTPEmail = async (to, otp, purpose = 'verification') => {
-  const subject = purpose === 'login' 
-    ? 'Your Login OTP' 
-    : purpose === 'application'
-    ? 'Your Application OTP'
-    : 'Your Verification OTP';
-
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-      <h2 style="color: #333;">${subject}</h2>
-      <p style="color: #666; font-size: 16px;">Your OTP code is:</p>
-      <div style="background-color: #f4f4f4; padding: 20px; text-align: center; margin: 20px 0;">
-        <h1 style="color: #007bff; font-size: 32px; margin: 0;">${otp}</h1>
-      </div>
-      <p style="color: #666; font-size: 14px;">This OTP is valid for 10 minutes.</p>
-      <p style="color: #999; font-size: 12px; margin-top: 30px;">If you didn't request this OTP, please ignore this email.</p>
-    </div>
-  `;
-
-  return await sendEmail(to, subject, html);
-};
+export async function sendOTPEmail(to, otp, purpose = 'verification') {
+  const subject = `Your OTP for ${purpose}`;
+  const html = `<div style="font-family:sans-serif">
+    <h3>OTP for ${purpose}</h3>
+    <p><strong>${otp}</strong></p>
+    <p>Expires in 10 minutes.</p>
+  </div>`;
+  const text = `OTP for ${purpose}: ${otp} (expires in 10 minutes)`;
+  return sendEmail({ to, subject, html, text });
+}
 
 

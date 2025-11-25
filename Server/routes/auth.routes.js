@@ -2,10 +2,61 @@ import express from 'express';
 import User from '../models/User.model.js';
 import OTP from '../models/OTP.model.js';
 import { generateToken, generateOTP } from '../utils/generateToken.js';
-import { sendOTPEmail } from '../utils/sendEmail.js';
+import { sendOTPEmail, verifySMTP } from '../utils/sendEmail.js';
 import { protect } from '../middleware/auth.middleware.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const router = express.Router();
+
+// Added SMTP env validation + helpful warning
+const emailEnvKeys = ['EMAIL_HOST','EMAIL_PORT','EMAIL_USER','EMAIL_PASS'];
+const missingEmailEnv = emailEnvKeys.filter(k => !process.env[k]);
+if (missingEmailEnv.length) {
+  console.warn('[SMTP] Missing env vars:', missingEmailEnv.join(', '));
+  console.warn('[SMTP] Email sending will likely fail until these are set.');
+}
+
+let smtpStatus = { verified: false, lastError: null };
+(async () => {
+  try {
+    const ok = await verifySMTP();
+    smtpStatus.verified = ok.success;
+    smtpStatus.lastError = ok.error || null;
+    if (!ok.success) console.error('[SMTP][startup] verify failed:', ok);
+  } catch (e) {
+    smtpStatus.lastError = e.message;
+    console.error('[SMTP][startup] unexpected verify error:', e);
+  }
+})();
+
+// Central SMTP preflight helper
+function smtpPreflight() {
+  const required = ['EMAIL_HOST','EMAIL_PORT','EMAIL_USER','EMAIL_PASS'];
+  const missing = required.filter(k => !process.env[k]);
+  const empty = required.filter(k => process.env[k] === '');
+  const host = process.env.EMAIL_HOST || '';
+  let gmailHint = null;
+  if (/gmail\.com$/i.test(host) && (process.env.EMAIL_PASS || '').length < 16) {
+    gmailHint = 'Gmail requires an App Password (16 chars) when 2FA is enabled.';
+  }
+  return {
+    ok: !missing.length && !empty.length,
+    missing,
+    empty,
+    gmailHint
+  };
+}
+
+// Simple status route
+router.get('/smtp-status', (_req, res) => {
+  res.json({
+    success: true,
+    verified: smtpStatus.verified,
+    lastError: smtpStatus.lastError,
+    missingEnv: missingEmailEnv
+  });
+});
 
 // @route   POST /api/auth/register
 // @desc    Register a new user
@@ -120,13 +171,19 @@ router.post('/login', async (req, res) => {
 // @access  Public
 router.post('/send-otp', async (req, res) => {
   try {
-    const { email, phone, purpose } = req.body; // purpose: 'email', 'phone', 'login', 'application'
-
-    if (!email && !phone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email or phone'
-      });
+    // Early SMTP auth check only if we will send an email
+    const { email, phone, purpose } = req.body;
+    if (email) {
+      const pre = smtpPreflight();
+      if (!pre.ok) {
+        return res.status(500).json({
+          success: false,
+            message: 'SMTP credentials/config incomplete.',
+            missing: pre.missing,
+            empty: pre.empty,
+            ...(pre.gmailHint && { gmailHint: pre.gmailHint })
+        });
+      }
     }
 
     const otp = generateOTP();
@@ -147,17 +204,25 @@ router.post('/send-otp', async (req, res) => {
         });
 
         // Send OTP via email
-        const emailResult = await sendOTPEmail(email, otp, 'application');
+        let emailResult;
+        try {
+          emailResult = await sendOTPEmail(email, otp, 'application');
+        } catch (err) {
+          console.error('[SMTP] Uncaught sendOTPEmail error:', err);
+          emailResult = { success: false, error: err.message, code: err.code };
+        }
+
         if (!emailResult.success) {
-          console.error('❌ Email sending failed:', emailResult.error);
+          const authFail = emailResult.code === 'EAUTH' || /auth/i.test(emailResult.error || '');
+          console.error('❌ Email sending failed:', emailResult);
           return res.status(500).json({
             success: false,
-            message: emailResult.error || 'Failed to send OTP email. Please check email configuration.',
-            // In development, still return OTP for testing
-            ...(process.env.NODE_ENV !== 'production' && { 
-              devOtp: otp,
-              error: emailResult.error 
-            })
+            message: authFail
+              ? 'SMTP authentication failed. Verify EMAIL_USER / EMAIL_PASS.'
+              : (emailResult.error || 'Failed to send OTP email.'),
+            smtpErrorCode: emailResult.code,
+            // expose OTP only outside production for debugging
+            ...(process.env.NODE_ENV !== 'production' && { devOtp: otp })
           });
         }
 
@@ -240,11 +305,61 @@ router.post('/send-otp', async (req, res) => {
       await user.save();
     }
 
-    // Send OTP via email if email is provided
+    // Send OTP via email if email is provided (improved error handling)
     if (email) {
-      const emailResult = await sendOTPEmail(email, otp, purpose || 'verification');
+      const pre = smtpPreflight();
+      if (!pre.ok) {
+        return res.status(500).json({
+          success: false,
+          message: 'SMTP credentials/config incomplete.',
+          missing: pre.missing,
+          empty: pre.empty,
+          ...(pre.gmailHint && { gmailHint: pre.gmailHint }),
+          ...(process.env.NODE_ENV !== 'production' && { devOtp: otp })
+        });
+      }
+
+      let emailResult;
+      try {
+        emailResult = await sendOTPEmail(email, otp, purpose || 'verification');
+      } catch (err) {
+        emailResult = { success: false, error: err.message, code: err.code };
+      }
+
       if (!emailResult.success) {
-        console.error('Email sending failed:', emailResult.error);
+        const authFail = emailResult.code === 'EAUTH' || /auth/i.test(emailResult.error || '');
+        const baseMessage = authFail
+          ? 'SMTP authentication failed.'
+          : (emailResult.error || 'Email send failed.');
+        const suggestions = emailResult.suggestions || (authFail ? [
+          'Check EMAIL_USER / EMAIL_PASS',
+          'If Gmail: use an App Password (2FA required)',
+          'Match EMAIL_PORT with security (465 secure, 587 STARTTLS)'
+        ] : []);
+
+        // Hard fail if prod or missing config
+        if (process.env.NODE_ENV === 'production' || authFail || missingEmailEnv.length) {
+          return res.status(500).json({
+            success: false,
+            message: baseMessage,
+            code: emailResult.code,
+            ...(missingEmailEnv.length && { missingEnv: missingEmailEnv }),
+            ...(process.env.NODE_ENV !== 'production' && { devOtp: otp }),
+            ...(suggestions.length && { suggestions })
+          });
+        }
+
+        // Dev soft fallback
+        return res.json({
+          success: true,
+            message: 'OTP generated (email send failed in dev).',
+            otpExpiresIn: 600,
+            devOtp: otp,
+            smtpWarning: baseMessage,
+            code: emailResult.code,
+            ...(suggestions.length && { suggestions }),
+            ...(emailResult.diagnostic && { diagnostic: emailResult.diagnostic })
+        });
       }
     }
 
@@ -253,13 +368,15 @@ router.post('/send-otp', async (req, res) => {
       console.log(`OTP for ${phone}: ${otp}`); // For development - remove in production
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: 'OTP sent successfully',
-      otpExpiresIn: 600 // 10 minutes in seconds
+      otpExpiresIn: 600, // 10 minutes in seconds
+      ...(process.env.NODE_ENV !== 'production' && { devOtp: otp })
     });
   } catch (error) {
-    res.status(500).json({
+    console.error('[SEND_OTP_FATAL]', error);
+    return res.status(500).json({
       success: false,
       message: error.message || 'Server error'
     });
@@ -474,6 +591,8 @@ router.get('/me', protect, async (req, res) => {
     });
   }
 });
+
+// sendEmail now re-exported from sendEmail.js (used by application.routes.js)
 
 export default router;
 
