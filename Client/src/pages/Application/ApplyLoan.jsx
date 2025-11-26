@@ -26,6 +26,9 @@ const ApplyLoan = () => {
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [otp, setOtp] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [categoryError, setCategoryError] = useState(null);
 
   const [formData, setFormData] = useState({
     loanId: loanId || '',
@@ -120,6 +123,19 @@ const ApplyLoan = () => {
       }
     }
   }, [loanId]);
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await api.get('/categories?withCounts=1');
+      setCategories(res.data.data || []);
+    } catch (e) {
+      setCategoryError(e.response?.data?.message || 'Categories unavailable');
+    }
+  };
 
   const fetchLoans = async () => {
     try {
@@ -252,6 +268,11 @@ const ApplyLoan = () => {
   const prevStep = () => {
     if (step > 1) setStep(step - 1);
   };
+
+  // Filter loans by selectedCategory
+  const filteredLoans = selectedCategory
+    ? loans.filter(l => l.category && (l.category._id === selectedCategory || l.category === selectedCategory))
+    : loans;
 
   return (
     <div className="min-h-screen bg-gray-50 py-12">
@@ -635,13 +656,13 @@ const ApplyLoan = () => {
                     value={formData.loanId}
                     onChange={(e) => {
                       setFormData({ ...formData, loanId: e.target.value });
-                      const loan = loans.find(l => l._id === e.target.value);
-                      if (loan) setSelectedLoan(loan);
+                      const loan = filteredLoans.find(l => l._id === e.target.value);
+                      setSelectedLoan(loan || null);
                     }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">Select Loan Type</option>
-                    {loans.map((loan) => (
+                    {filteredLoans.map((loan) => (
                       <option key={loan._id} value={loan._id}>
                         {loan.name}
                       </option>
@@ -649,8 +670,34 @@ const ApplyLoan = () => {
                   </select>
                 </div>
 
+                {/* Category Selection */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Loan Category
+                  </label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => {
+                      setSelectedCategory(e.target.value);
+                      // Clear selected loan when category changes
+                      setFormData(f => ({ ...f, loanId: '' }));
+                      setSelectedLoan(null);
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">All Categories</option>
+                    {categories.map(c => (
+                      <option key={c._id} value={c._id}>{c.name} ({c.loanCount || 0})</option>
+                    ))}
+                  </select>
+                  {categoryError && <p className="text-xs text-red-600 mt-2">{categoryError}</p>}
+                </div>
+
                 {selectedLoan && (
                   <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                    <p className="text-sm text-gray-600 mb-2">
+                      <strong>Category:</strong> {selectedLoan.category?.name || 'Uncategorized'}
+                    </p>
                     <p className="text-sm text-gray-600 mb-2">
                       <strong>Interest Rate:</strong> {selectedLoan.interestRate?.min}% - {selectedLoan.interestRate?.max}%
                     </p>

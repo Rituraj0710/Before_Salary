@@ -30,3 +30,4 @@ const homeBenefitCardSchema = new mongoose.Schema({
 
 export default mongoose.model('HomeBenefitCard', homeBenefitCardSchema);
 
+

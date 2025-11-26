@@ -135,7 +135,8 @@ router.get('/', protect, async (req, res) => {
     }
 
     const applications = await Application.find(query)
-      .populate('loanId', 'name type')
+      .populate('loanId', 'name type category')
+      .populate({ path: 'loanId', populate: { path: 'category', select: 'name slug active' } })
       .populate('userId', 'name email phone')
       .sort({ createdAt: -1 });
 
@@ -158,7 +159,7 @@ router.get('/', protect, async (req, res) => {
 router.get('/:id', protect, async (req, res) => {
   try {
     const application = await Application.findById(req.params.id)
-      .populate('loanId')
+      .populate({ path: 'loanId', populate: { path: 'category', select: 'name slug active' } })
       .populate('userId', 'name email phone')
       .populate('approvedBy', 'name');
 
@@ -356,5 +357,6 @@ function validateObjectId(id, field) {
 }
 
 export default router;
+
 
 

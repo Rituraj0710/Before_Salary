@@ -34,7 +34,8 @@ const AdminLayout = ({ children, activeTab, setActiveTab }) => {
     { id: 'authentication', name: 'Authentication', icon: Cog6ToothIcon },
     { id: 'faq', name: 'FAQ Management', icon: DocumentTextIcon },
     { id: 'settings', name: 'Site Settings', icon: Cog6ToothIcon },
-    { id: 'content', name: 'Content Management', icon: DocumentTextIcon }
+    { id: 'content', name: 'Content Management', icon: DocumentTextIcon },
+    { id: 'categories', name: 'Loan Categories', icon: Cog6ToothIcon }
   ];
 
   return (

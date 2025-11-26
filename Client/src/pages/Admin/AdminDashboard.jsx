@@ -19,6 +19,7 @@ import AuthenticationSettings from './AuthenticationSettings';
 import HomeLoanCards from './HomeLoanCards';
 import HomeContentSettings from './HomeContentSettings';
 import FAQManagement from './FAQManagement';
+import Categories from './Categories';
 
 const AdminDashboard = () => {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -306,6 +307,11 @@ const AdminDashboard = () => {
         <FAQManagement />
       )}
 
+      {/* Loan Categories Tab */}
+      {(activeTab === 'categories' || activeTab === 'loan-categories') && (
+        <Categories />
+      )}
+
       {/* Settings Tab */}
       {activeTab === 'settings' && (
         <div>
@@ -323,6 +329,13 @@ const AdminDashboard = () => {
           <div className="bg-white rounded-lg shadow p-6">
             <p className="text-gray-600">Content management coming soon...</p>
           </div>
+        </div>
+      )}
+
+      {/* Fallback for unknown tabs */}
+      {!['dashboard','loans','home-loan-cards','hero-banner','logo','navigation','home-content','authentication','faq','settings','content','categories','loan-categories'].includes(activeTab) && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <p className="text-gray-600">No content for this section.</p>
         </div>
       )}
     </AdminLayout>

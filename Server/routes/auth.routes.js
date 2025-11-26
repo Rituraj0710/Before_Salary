@@ -594,5 +594,11 @@ router.get('/me', protect, async (req, res) => {
 
 // sendEmail now re-exported from sendEmail.js (used by application.routes.js)
 
+// (Category management added separately; no change here)
+// NOTE: Ensure in server.js:
+// import categoryRoutes from './routes/category.routes.js';
+// app.use('/api/categories', categoryRoutes);
+// Without this, /api/categories will 404.
+
 export default router;
 
