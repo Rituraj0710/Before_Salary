@@ -100,7 +100,8 @@ const loanSchema = new mongoose.Schema({
     annualRate: { type: Number, set: safeNum },
     tenureMonths: { type: Number, set: safeNum },
     emi: { type: Number, set: safeNum } // optional
-  }
+  },
+  category: { type: mongoose.Schema.Types.ObjectId, ref: 'LoanCategory', index: true }
 }, {
   timestamps: true
 });
@@ -136,5 +137,6 @@ loanSchema.pre('validate', function(next) {
 });
 
 export default mongoose.model('Loan', loanSchema);
+
 
 

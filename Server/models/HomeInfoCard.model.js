@@ -29,3 +29,4 @@ const homeInfoCardSchema = new mongoose.Schema({
 
 export default mongoose.model('HomeInfoCard', homeInfoCardSchema);
 
+

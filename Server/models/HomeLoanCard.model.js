@@ -32,3 +32,4 @@ const homeLoanCardSchema = new mongoose.Schema({
 
 export default mongoose.model('HomeLoanCard', homeLoanCardSchema);
 
+

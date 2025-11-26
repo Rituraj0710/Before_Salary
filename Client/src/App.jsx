@@ -24,6 +24,7 @@ import PrivacyPolicy from './pages/Info/PrivacyPolicy';
 import Terms from './pages/Info/Terms';
 import Contact from './pages/Info/Contact';
 import RepayLoan from './pages/Repay/RepayLoan';
+import Categories from './pages/Admin/Categories';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -156,6 +157,14 @@ function App() {
               }
             />
             <Route
+              path="/admin/categories"
+              element={
+                <ProtectedRoute adminOnly>
+                  <Categories />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/*"
               element={
                 <ProtectedRoute adminOnly>
@@ -163,6 +172,9 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Redirect public categories to admin categories */}
+            <Route path="/categories" element={<Navigate to="/admin/categories" replace />} />
 
             {/* 404 */}
             <Route path="*" element={<Navigate to="/" replace />} />

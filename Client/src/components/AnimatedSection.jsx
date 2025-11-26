@@ -62,3 +62,4 @@ const AnimatedSection = ({ children, direction = 'left', delay = 0, className = 
 export default AnimatedSection;
 
 
+

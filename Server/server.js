@@ -13,6 +13,7 @@ import userRoutes from './routes/user.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import contentRoutes from './routes/content.routes.js';
 import homeRoutes from './routes/home.routes.js';
+import categoryRoutes from './routes/category.routes.js';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/home', homeRoutes);
+app.use('/api/categories', categoryRoutes); 
 
 // Health Check
 app.get('/api/health', (req, res) => {
