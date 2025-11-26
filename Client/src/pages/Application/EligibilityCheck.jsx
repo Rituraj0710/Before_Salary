@@ -105,9 +105,8 @@ const EligibilityCheck = () => {
     try {
       const result = await verifyOTP(email, null, otp, 'application');
       if (result.success) {
-        setOtpStep('verified');
-        setVerifiedEmail(email);
-        // Don't store in sessionStorage - require fresh verification each time
+        // Change route to dashboard after OTP verification
+        window.location.href = '/dashboard';
         toast.success('Email address verified successfully!');
       } else {
         toast.error(result.message || 'Invalid OTP. Please try again.');
@@ -339,21 +338,6 @@ const EligibilityCheck = () => {
 
               {otpStep === 'otp' && (
                 <div className="space-y-6">
-                  {/* Development OTP Display - Only show if provided by backend (email may have failed) */}
-                  {devOtp && (
-                    <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4">
-                      <p className="text-xs text-yellow-800 font-semibold mb-1">⚠️ Email may not be configured:</p>
-                      <p className="text-lg font-bold text-yellow-900">Your OTP: {devOtp}</p>
-                      <p className="text-xs text-yellow-700 mt-1">
-                        <strong>Please check your email inbox first!</strong>
-                        <br />
-                        If you didn't receive the email, the OTP is shown above for testing.
-                        <br />
-                        <strong>To receive OTP via Gmail:</strong> Configure EMAIL_USER and EMAIL_PASS (App Password) in Server/.env file
-                      </p>
-                    </div>
-                  )}
-                  
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Enter OTP sent to {email}

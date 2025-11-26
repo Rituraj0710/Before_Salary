@@ -9,9 +9,12 @@ import {
   XMarkIcon,
   CreditCardIcon,
   GlobeAltIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  UserIcon
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
+import Users from './Users';
+import { Routes, Route } from 'react-router-dom';
 
 const AdminLayout = ({ children, activeTab, setActiveTab }) => {
   const { user, logout } = useAuth();
@@ -25,7 +28,9 @@ const AdminLayout = ({ children, activeTab, setActiveTab }) => {
 
   const tabs = [
     { id: 'dashboard', name: 'Dashboard', icon: HomeIcon },
+    { id: 'users', name: 'Verified Users', icon: UserIcon },
     { id: 'loans', name: 'Loan Management', icon: CreditCardIcon },
+    { id: 'categories', name: 'Loan Categories', icon: Cog6ToothIcon },
     { id: 'home-loan-cards', name: 'Home Loan Cards', icon: CreditCardIcon },
     { id: 'hero-banner', name: 'Hero Banner', icon: PhotoIcon },
     { id: 'logo', name: 'Logo & Branding', icon: PhotoIcon },
@@ -35,7 +40,7 @@ const AdminLayout = ({ children, activeTab, setActiveTab }) => {
     { id: 'faq', name: 'FAQ Management', icon: DocumentTextIcon },
     { id: 'settings', name: 'Site Settings', icon: Cog6ToothIcon },
     { id: 'content', name: 'Content Management', icon: DocumentTextIcon },
-    { id: 'categories', name: 'Loan Categories', icon: Cog6ToothIcon }
+
   ];
 
   return (
@@ -106,6 +111,9 @@ const AdminLayout = ({ children, activeTab, setActiveTab }) => {
 
         {/* Main Content */}
         <main className="flex-1 p-6">
+          <Routes>
+            <Route path="users" element={<Users />} />
+          </Routes>
           {children}
         </main>
       </div>

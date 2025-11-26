@@ -60,6 +60,8 @@ export const AuthProvider = ({ children }) => {
       toast.success('Login successful!');
       
       console.log('Login successful, user role:', userData.role);
+      // Change route to dashboard instead of login page
+      window.location.href = '/dashboard';
       return { success: true, user: userData };
     } catch (error) {
       console.error('Login error:', error);
@@ -69,28 +71,28 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, phone, password) => {
-    try {
-      const response = await api.post('/auth/register', {
-        name,
-        email,
-        phone,
-        password,
-      });
-      const { token, user: userData } = response.data;
+  // const register = async (name, email, phone, password) => {
+  //   try {
+  //     const response = await api.post('/auth/register', {
+  //       name,
+  //       email,
+  //       phone,
+  //       password,
+  //     });
+  //     const { token, user: userData } = response.data;
       
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
-      setIsAuthenticated(true);
-      toast.success('Registration successful!');
-      return { success: true };
-    } catch (error) {
-      const message = error.response?.data?.message || 'Registration failed';
-      toast.error(message);
-      return { success: false, message };
-    }
-  };
+  //     localStorage.setItem('token', token);
+  //     localStorage.setItem('user', JSON.stringify(userData));
+  //     setUser(userData);
+  //     setIsAuthenticated(true);
+  //     toast.success('Registration successful!');
+  //     return { success: true };
+  //   } catch (error) {
+  //     const message = error.response?.data?.message || 'Registration failed';
+  //     toast.error(message);
+  //     return { success: false, message };
+  //   }
+  // };
 
   const logout = () => {
     localStorage.removeItem('token');
@@ -180,7 +182,6 @@ export const AuthProvider = ({ children }) => {
     loading,
     isAuthenticated,
     login,
-    register,
     logout,
     sendOTP,
     verifyOTP,
