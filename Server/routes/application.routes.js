@@ -17,7 +17,7 @@ router.post('/', protect, uploadMultiple, async (req, res) => {
     const applicationData = req.body;
 
     // Parse JSON fields if they're strings
-    ['personalInfo','address','employmentInfo','loanDetails'].forEach(f => {
+    ['personalInfo','address','employmentInfo','loanDetails','dynamicFields'].forEach(f => {
       if (typeof applicationData[f] === 'string') {
         try { applicationData[f] = JSON.parse(applicationData[f]); } catch { /* ignore */ }
       }
@@ -73,6 +73,9 @@ router.post('/', protect, uploadMultiple, async (req, res) => {
     pushGroup(files.bankStatement, 'Bank Statement');
     pushGroup(files.otherDocuments, 'Other');
 
+    // Handle dynamic fields
+    const dynamicFields = applicationData.dynamicFields || {};
+    
     // Create application
     const application = await Application.create({
       userId: req.user._id,
@@ -88,6 +91,7 @@ router.post('/', protect, uploadMultiple, async (req, res) => {
         emi
       },
       documents,
+      dynamicFields: dynamicFields,
       status: 'Submitted'
     });
 

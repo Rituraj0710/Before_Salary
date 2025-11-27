@@ -85,6 +85,11 @@ const applicationSchema = new mongoose.Schema({
   applicationNumber: {
     type: String,
     unique: true
+  },
+  dynamicFields: {
+    type: Map,
+    of: mongoose.Schema.Types.Mixed,
+    default: {}
   }
 }, {
   timestamps: true

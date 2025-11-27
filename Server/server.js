@@ -14,6 +14,7 @@ import adminRoutes from './routes/admin.routes.js';
 import contentRoutes from './routes/content.routes.js';
 import homeRoutes from './routes/home.routes.js';
 import categoryRoutes from './routes/category.routes.js';
+import formFieldRoutes from './routes/formField.routes.js';
 
 dotenv.config();
 
@@ -29,8 +30,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Database Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/beforesalary')
+mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB Connected Successfully'))
+  // .then(() => console.log("MONGODB_URI"))
   .catch((error) => console.error('MongoDB Connection Error:', error));
 
 // Routes
@@ -41,7 +43,8 @@ app.use('/api/user', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/home', homeRoutes);
-app.use('/api/categories', categoryRoutes); 
+app.use('/api/categories', categoryRoutes);
+app.use('/api/form-fields', formFieldRoutes); 
 
 // Health Check
 app.get('/api/health', (req, res) => {
