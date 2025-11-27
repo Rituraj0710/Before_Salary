@@ -26,6 +26,7 @@ const AdminLayout = ({ children, activeTab, setActiveTab }) => {
   const tabs = [
     { id: 'dashboard', name: 'Dashboard', icon: HomeIcon },
     { id: 'loans', name: 'Loan Management', icon: CreditCardIcon },
+    { id: 'user-form-loan-detail', name: 'User Form – Loan Detail', icon: DocumentTextIcon },
     { id: 'home-loan-cards', name: 'Home Loan Cards', icon: CreditCardIcon },
     { id: 'hero-banner', name: 'Hero Banner', icon: PhotoIcon },
     { id: 'logo', name: 'Logo & Branding', icon: PhotoIcon },

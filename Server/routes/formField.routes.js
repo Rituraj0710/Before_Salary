@@ -12,8 +12,38 @@ function admin(req, res) {
   return true;
 }
 
-// @route   GET /api/form-fields/:loanId
+// @route   GET /api/form-fields/loan/:loanId
 // @desc    Get all form fields for a loan
+// @access  Private
+router.get('/loan/:loanId', protect, async (req, res) => {
+  try {
+    const fields = await LoanApplicationFormField.find({ 
+      loanId: req.params.loanId,
+      isActive: true
+    }).sort({ order: 1, createdAt: 1 });
+    res.json({ success: true, data: fields });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// @route   GET /api/form-fields/category/:categoryId
+// @desc    Get all form fields for a category
+// @access  Private
+router.get('/category/:categoryId', protect, async (req, res) => {
+  try {
+    const fields = await LoanApplicationFormField.find({ 
+      categoryId: req.params.categoryId,
+      isActive: true
+    }).sort({ order: 1, createdAt: 1 });
+    res.json({ success: true, data: fields });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// @route   GET /api/form-fields/:loanId (backward compatibility)
+// @desc    Get all form fields for a loan (admin only)
 // @access  Private/Admin
 router.get('/:loanId', protect, async (req, res) => {
   if (!admin(req, res)) return;
@@ -33,17 +63,25 @@ router.get('/:loanId', protect, async (req, res) => {
 router.post('/', protect, async (req, res) => {
   if (!admin(req, res)) return;
   try {
-    const { loanId, name, type, width, required, placeholder, label, options, order } = req.body;
+    const { loanId, categoryId, name, type, width, required, placeholder, label, options, order } = req.body;
     
-    if (!loanId || !name || !type) {
+    if ((!loanId && !categoryId) || !name || !type) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Loan ID, name, and type are required' 
+        message: 'Either loanId or categoryId, name, and type are required' 
+      });
+    }
+
+    if (loanId && categoryId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Cannot specify both loanId and categoryId' 
       });
     }
 
     const field = await LoanApplicationFormField.create({
-      loanId,
+      loanId: loanId || undefined,
+      categoryId: categoryId || undefined,
       name: name.trim(),
       type,
       width: width || 'full',
