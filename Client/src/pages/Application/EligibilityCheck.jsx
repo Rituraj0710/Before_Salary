@@ -30,7 +30,87 @@ const EligibilityCheck = () => {
     if (location.state?.eligibilityData) {
       setFormData(location.state.eligibilityData);
     }
-  }, [location.pathname]);
+    // Always require fresh email verification - don't auto-verify from sessionStorage
+    // Clear any old verification data to ensure fresh verification each time
+    sessionStorage.removeItem('emailVerified');
+    
+    // Reset to email input step
+    setOtpStep('email');
+    setEmail('');
+    setOtp('');
+    setOtpSent(false);
+    setVerifiedEmail('');
+    setDevOtp(null);
+  }, [location.pathname]); // Only reset when pathname changes, not on every location change
+
+  // OTP Timer
+  useEffect(() => {
+    if (otpTimer > 0) {
+      const timer = setTimeout(() => setOtpTimer(otpTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpTimer]);
+
+  // Handle Email Input
+  const handleEmailChange = (e) => {
+    setEmail(e.target.value);
+  };
+
+  // Send OTP
+  const handleSendOTP = async () => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    try {
+      const result = await sendOTP(email, null, 'application');
+      if (result.success) {
+        setOtpSent(true);
+        setOtpStep('otp');
+        setOtpTimer(60); // 60 seconds timer
+        // Store dev OTP if available (development mode only)
+        if (result.data?.devOtp) {
+          setDevOtp(result.data.devOtp);
+          console.log('Development OTP:', result.data.devOtp);
+        }
+        toast.success('OTP sent to your email address. Check your inbox or server console for OTP (development mode)');
+      } else {
+        toast.error(result.message || 'Failed to send OTP');
+      }
+    } catch (error) {
+      console.error('OTP send error:', error);
+      toast.error(error.message || 'Failed to send OTP. Please try again.');
+    }
+  };
+
+  // Verify OTP
+  const handleVerifyOTP = async () => {
+    if (!otp || otp.length !== 6) {
+      toast.error('Please enter a valid 6-digit OTP');
+      return;
+    }
+
+    try {
+      const result = await verifyOTP(email, null, otp, 'application');
+      if (result.success) {
+        setOtpStep('verified');
+        setVerifiedEmail(email);
+        // Don't store in sessionStorage - require fresh verification each time
+        toast.success('Email address verified successfully!');
+      } else {
+        toast.error(result.message || 'Invalid OTP. Please try again.');
+      }
+    } catch (error) {
+      console.error('OTP verify error:', error);
+      toast.error(error.message || 'Invalid OTP. Please try again.');
+    }
+  };
+
+  // Resend OTP
+  const handleResendOTP = async () => {
+    await handleSendOTP();
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;

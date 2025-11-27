@@ -42,7 +42,7 @@ const Navbar = () => {
               About Us
             </Link>
             <Link to="/loans" className="text-gray-700 hover:text-orange-500 font-medium transition">
-              Product
+              Loans
             </Link>
             <Link to="/faq" className="text-gray-700 hover:text-orange-500 font-medium transition">
               FAQs
