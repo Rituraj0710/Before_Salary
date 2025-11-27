@@ -119,16 +119,45 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Store verified client emails in localStorage
+  const addVerifiedClient = (email) => {
+    if (!email) return;
+    let verifiedClients = [];
+    try {
+      verifiedClients = JSON.parse(localStorage.getItem('verifiedClients') || '[]');
+    } catch {
+      verifiedClients = [];
+    }
+    if (!verifiedClients.includes(email)) {
+      verifiedClients.push(email);
+      localStorage.setItem('verifiedClients', JSON.stringify(verifiedClients));
+    }
+  };
+
+  // Check if a client is already verified
+  const isClientVerified = (email) => {
+    if (!email) return false;
+    try {
+      const verifiedClients = JSON.parse(localStorage.getItem('verifiedClients') || '[]');
+      return verifiedClients.includes(email);
+    } catch {
+      return false;
+    }
+  };
+
   const verifyOTP = async (email, phone, otp, purpose = 'verification') => {
+    // If already verified, skip verification and return success
+    if (purpose === 'application' && isClientVerified(email)) {
+      toast.success('Email already verified!');
+      return { success: true, alreadyVerified: true };
+    }
     try {
       const response = await api.post('/auth/verify-otp', { email, phone, otp, purpose });
-      
-      // For application purpose, don't set auth state (user might not have account yet)
       if (purpose === 'application') {
         toast.success('OTP verified successfully!');
+        addVerifiedClient(email);
         return { success: true, data: response.data };
       }
-      
       // For other purposes, set auth state
       const { token, user: userData } = response.data;
       if (token && userData) {
@@ -138,6 +167,7 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
       }
       toast.success('OTP verified successfully!');
+      addVerifiedClient(email);
       return { success: true, data: response.data };
     } catch (error) {
       const message = error.response?.data?.message || 'Invalid OTP';
@@ -186,6 +216,7 @@ export const AuthProvider = ({ children }) => {
     sendOTP,
     verifyOTP,
     loginWithFirebase,
+    isClientVerified, // export this for use in components if needed
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

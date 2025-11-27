@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../utils/api';
 import { 
@@ -14,10 +14,17 @@ const Dashboard = () => {
   const { user } = useAuth();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
+    // Redirect to OTP verification if user is not verified
+    if (user && user.verified === false) {
+      navigate('/verify-otp', { replace: true, state: { redirectTo: '/eligibility' } });
+      return;
+    }
     fetchApplications();
-  }, []);
+    // eslint-disable-next-line
+  }, [user]);
 
   const fetchApplications = async () => {
     try {

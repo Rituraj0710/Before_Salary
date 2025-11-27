@@ -25,6 +25,7 @@ import Terms from './pages/Info/Terms';
 import Contact from './pages/Info/Contact';
 import RepayLoan from './pages/Repay/RepayLoan';
 import Categories from './pages/Admin/Categories';
+import Applynow from './pages/Application/Applynow';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -178,6 +179,7 @@ function App() {
 
             {/* 404 */}
             <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/applynow" element={<Applynow />} />
           </Routes>
         </AppLayout>
         <Toaster position="top-right" />
