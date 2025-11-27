@@ -20,7 +20,6 @@ import HomeLoanCards from './HomeLoanCards';
 import HomeContentSettings from './HomeContentSettings';
 import FAQManagement from './FAQManagement';
 import Categories from './Categories';
-import UserFormLoanDetail from './UserFormLoanDetail';
 
 const AdminDashboard = () => {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -268,6 +267,12 @@ const AdminDashboard = () => {
         </>
       )}
 
+      {/* Users Tab */}
+      {activeTab === 'users' && (
+        // Render the Users component directly here
+        <Users />
+      )}
+
       {/* Loan Management Tab */}
       {activeTab === 'loans' && (
         <LoanManagement />
@@ -339,7 +344,7 @@ const AdminDashboard = () => {
       )}
 
       {/* Fallback for unknown tabs */}
-      {!['dashboard','loans','user-form-loan-detail','home-loan-cards','hero-banner','logo','navigation','home-content','authentication','faq','settings','content','categories','loan-categories'].includes(activeTab) && (
+      {!['dashboard','loans','home-loan-cards','hero-banner','logo','navigation','home-content','authentication','faq','settings','content','categories','loan-categories'].includes(activeTab) && (
         <div className="bg-white rounded-lg shadow p-6">
           <p className="text-gray-600">No content for this section.</p>
         </div>

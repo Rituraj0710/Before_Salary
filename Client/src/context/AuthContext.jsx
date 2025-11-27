@@ -60,6 +60,8 @@ export const AuthProvider = ({ children }) => {
       toast.success('Login successful!');
       
       console.log('Login successful, user role:', userData.role);
+      // Change route to dashboard instead of login page
+      window.location.href = '/dashboard';
       return { success: true, user: userData };
     } catch (error) {
       console.error('Login error:', error);
@@ -69,28 +71,28 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, phone, password) => {
-    try {
-      const response = await api.post('/auth/register', {
-        name,
-        email,
-        phone,
-        password,
-      });
-      const { token, user: userData } = response.data;
+  // const register = async (name, email, phone, password) => {
+  //   try {
+  //     const response = await api.post('/auth/register', {
+  //       name,
+  //       email,
+  //       phone,
+  //       password,
+  //     });
+  //     const { token, user: userData } = response.data;
       
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      setUser(userData);
-      setIsAuthenticated(true);
-      toast.success('Registration successful!');
-      return { success: true };
-    } catch (error) {
-      const message = error.response?.data?.message || 'Registration failed';
-      toast.error(message);
-      return { success: false, message };
-    }
-  };
+  //     localStorage.setItem('token', token);
+  //     localStorage.setItem('user', JSON.stringify(userData));
+  //     setUser(userData);
+  //     setIsAuthenticated(true);
+  //     toast.success('Registration successful!');
+  //     return { success: true };
+  //   } catch (error) {
+  //     const message = error.response?.data?.message || 'Registration failed';
+  //     toast.error(message);
+  //     return { success: false, message };
+  //   }
+  // };
 
   const logout = () => {
     localStorage.removeItem('token');
@@ -117,16 +119,45 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Store verified client emails in localStorage
+  const addVerifiedClient = (email) => {
+    if (!email) return;
+    let verifiedClients = [];
+    try {
+      verifiedClients = JSON.parse(localStorage.getItem('verifiedClients') || '[]');
+    } catch {
+      verifiedClients = [];
+    }
+    if (!verifiedClients.includes(email)) {
+      verifiedClients.push(email);
+      localStorage.setItem('verifiedClients', JSON.stringify(verifiedClients));
+    }
+  };
+
+  // Check if a client is already verified
+  const isClientVerified = (email) => {
+    if (!email) return false;
+    try {
+      const verifiedClients = JSON.parse(localStorage.getItem('verifiedClients') || '[]');
+      return verifiedClients.includes(email);
+    } catch {
+      return false;
+    }
+  };
+
   const verifyOTP = async (email, phone, otp, purpose = 'verification') => {
+    // If already verified, skip verification and return success
+    if (purpose === 'application' && isClientVerified(email)) {
+      toast.success('Email already verified!');
+      return { success: true, alreadyVerified: true };
+    }
     try {
       const response = await api.post('/auth/verify-otp', { email, phone, otp, purpose });
-      
-      // For application purpose, don't set auth state (user might not have account yet)
       if (purpose === 'application') {
         toast.success('OTP verified successfully!');
+        addVerifiedClient(email);
         return { success: true, data: response.data };
       }
-      
       // For other purposes, set auth state
       const { token, user: userData } = response.data;
       if (token && userData) {
@@ -136,6 +167,7 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(true);
       }
       toast.success('OTP verified successfully!');
+      addVerifiedClient(email);
       return { success: true, data: response.data };
     } catch (error) {
       const message = error.response?.data?.message || 'Invalid OTP';
@@ -180,11 +212,11 @@ export const AuthProvider = ({ children }) => {
     loading,
     isAuthenticated,
     login,
-    register,
     logout,
     sendOTP,
     verifyOTP,
     loginWithFirebase,
+    isClientVerified, // export this for use in components if needed
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
