@@ -15,6 +15,7 @@ import contentRoutes from './routes/content.routes.js';
 import homeRoutes from './routes/home.routes.js';
 import categoryRoutes from './routes/category.routes.js';
 import formFieldRoutes from './routes/formField.routes.js';
+import eligibilityRoutes from './routes/eligibility.routes.js';
 
 dotenv.config();
 
@@ -44,7 +45,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/categories', categoryRoutes);
-app.use('/api/form-fields', formFieldRoutes); 
+app.use('/api/form-fields', formFieldRoutes);
+app.use('/api/eligibility', eligibilityRoutes); 
 
 // Health Check
 app.get('/api/health', (req, res) => {

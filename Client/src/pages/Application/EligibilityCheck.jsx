@@ -204,19 +204,67 @@ const EligibilityCheck = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (validateForm()) {
-      // Store eligibility data temporarily (only for this navigation)
-      // Clear email verification so user must verify again for new applications
-      sessionStorage.removeItem('emailVerified');
-      
-      // Navigate to full application form
-      navigate('/apply', { state: { eligibilityData: formData } });
-      toast.success('Eligibility check completed!');
-    } else {
+    if (!validateForm()) {
       toast.error('Please fill all required fields correctly');
+      return;
+    }
+
+    try {
+      // Submit eligibility data to database
+      const eligibilityData = {
+        email: verifiedEmail || email,
+        loanId: loanId || null,
+        pancard: formData.pancard,
+        dob: formData.dob,
+        gender: formData.gender,
+        personalEmail: formData.personalEmail,
+        employmentType: formData.employmentType,
+        companyName: formData.companyName || null,
+        nextSalaryDate: formData.nextSalaryDate || null,
+        netMonthlyIncome: formData.netMonthlyIncome,
+        pinCode: formData.pinCode,
+        state: formData.state || null,
+        city: formData.city || null
+      };
+
+      const response = await api.post('/eligibility', eligibilityData);
+      
+      if (response.data.success) {
+        toast.success('Eligibility check submitted successfully!');
+        
+        // Store eligibility data temporarily for application form
+        sessionStorage.setItem('eligibilityData', JSON.stringify(formData));
+        sessionStorage.removeItem('emailVerified');
+        
+        // If loanId is present, navigate to loan detail page
+        if (loanId) {
+          try {
+            const allLoansResponse = await api.get('/loans');
+            const loan = allLoansResponse.data.data?.find(l => l._id === loanId);
+            if (loan?.slug) {
+              navigate(`/loans/${loan.slug}`);
+            } else if (loan) {
+              navigate(`/loans/${loanId}`);
+            } else {
+              toast.error('Loan not found');
+            }
+          } catch (error) {
+            console.error('Error fetching loan:', error);
+            toast.error('Error loading loan details');
+          }
+        } else {
+          // If no loanId, navigate to full application form
+          navigate('/apply', { state: { eligibilityData: formData } });
+        }
+      } else {
+        toast.error(response.data.message || 'Failed to submit eligibility check');
+      }
+    } catch (error) {
+      console.error('Error submitting eligibility:', error);
+      toast.error(error.response?.data?.message || 'Failed to submit eligibility check. Please try again.');
     }
   };
 
