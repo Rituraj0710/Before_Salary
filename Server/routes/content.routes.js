@@ -24,7 +24,7 @@ router.get('/navigation', async (req, res) => {
           navigation: [
             { label: 'Home', path: '/', isPublic: true, isVisible: true },
             { label: 'About Us', path: '/about', isPublic: true, isVisible: true },
-            { label: 'Product', path: '/loans', isPublic: true, isVisible: true },
+            { label: 'Loans', path: '/loans', isPublic: true, isVisible: true },
             { label: 'FAQs', path: '/faq', isPublic: true, isVisible: true },
             { label: 'Repay Loan', path: '/repay', isPublic: true, isVisible: true },
             { label: 'Contact Us', path: '/contact', isPublic: true, isVisible: true }

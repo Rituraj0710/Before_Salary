@@ -30,7 +30,7 @@ const NavigationManagement = () => {
       setNavItems([
         { _id: '1', label: 'Home', path: '/', order: 1, isVisible: true, isPublic: true },
         { _id: '2', label: 'About Us', path: '/about', order: 2, isVisible: true, isPublic: true },
-        { _id: '3', label: 'Product', path: '/loans', order: 3, isVisible: true, isPublic: true },
+        { _id: '3', label: 'Loans', path: '/loans', order: 3, isVisible: true, isPublic: true },
         { _id: '4', label: 'FAQs', path: '/faq', order: 4, isVisible: true, isPublic: true },
         { _id: '5', label: 'Repay Loan', path: '/repay', order: 5, isVisible: true, isPublic: true },
         { _id: '6', label: 'Contact Us', path: '/contact', order: 6, isVisible: true, isPublic: true }

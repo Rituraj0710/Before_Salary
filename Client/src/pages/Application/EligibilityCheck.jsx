@@ -107,8 +107,31 @@ const EligibilityCheck = () => {
       if (result.success) {
         setOtpStep('verified');
         setVerifiedEmail(email);
-        // Don't store in sessionStorage - require fresh verification each time
         toast.success('Email address verified successfully!');
+        
+        // Navigate to loan detail page after OTP verification
+        if (loanId) {
+          try {
+            // Get all loans and find the one with matching ID
+            const allLoansResponse = await api.get('/loans');
+            const loan = allLoansResponse.data.data?.find(l => l._id === loanId);
+            if (loan?.slug) {
+              // Navigate to loan detail page using slug
+              navigate(`/loans/${loan.slug}`);
+            } else if (loan) {
+              // If loan exists but no slug, try using ID as fallback
+              navigate(`/loans/${loanId}`);
+            } else {
+              toast.error('Loan not found');
+            }
+          } catch (error) {
+            console.error('Error fetching loan:', error);
+            toast.error('Error loading loan details');
+          }
+        } else {
+          // If no loanId, show eligibility form as before
+          setOtpStep('verified');
+        }
       } else {
         toast.error(result.message || 'Invalid OTP. Please try again.');
       }

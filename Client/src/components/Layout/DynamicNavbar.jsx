@@ -53,7 +53,7 @@ const DynamicNavbar = () => {
           setNavItems([
             { label: 'Home', path: '/', isPublic: true },
             { label: 'About Us', path: '/about', isPublic: true },
-            { label: 'Product', path: '/loans', isPublic: true },
+            { label: 'Loans', path: '/loans', isPublic: true },
             { label: 'FAQs', path: '/faq', isPublic: true },
             { label: 'Repay Loan', path: '/repay', isPublic: true },
             { label: 'Contact Us', path: '/contact', isPublic: true }
@@ -66,7 +66,7 @@ const DynamicNavbar = () => {
       setNavItems([
         { label: 'Home', path: '/', isPublic: true },
         { label: 'About Us', path: '/about', isPublic: true },
-        { label: 'Product', path: '/loans', isPublic: true },
+        { label: 'Loans', path: '/loans', isPublic: true },
         { label: 'FAQs', path: '/faq', isPublic: true },
         { label: 'Repay Loan', path: '/repay', isPublic: true },
         { label: 'Contact Us', path: '/contact', isPublic: true }
