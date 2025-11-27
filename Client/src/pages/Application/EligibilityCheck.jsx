@@ -108,29 +108,9 @@ const EligibilityCheck = () => {
         setOtpStep('verified');
         setVerifiedEmail(email);
         toast.success('Email address verified successfully!');
-        
-        // Navigate to loan detail page after OTP verification
-        if (loanId) {
-          try {
-            // Get all loans and find the one with matching ID
-            const allLoansResponse = await api.get('/loans');
-            const loan = allLoansResponse.data.data?.find(l => l._id === loanId);
-            if (loan?.slug) {
-              // Navigate to loan detail page using slug
-              navigate(`/loans/${loan.slug}`);
-            } else if (loan) {
-              // If loan exists but no slug, try using ID as fallback
-              navigate(`/loans/${loanId}`);
-            } else {
-              toast.error('Loan not found');
-            }
-          } catch (error) {
-            console.error('Error fetching loan:', error);
-            toast.error('Error loading loan details');
-          }
-        } else {
-          // If no loanId, show eligibility form as before
-          setOtpStep('verified');
+        // Pre-fill personal email if empty
+        if (!formData.personalEmail) {
+          setFormData(prev => ({ ...prev, personalEmail: email }));
         }
       } else {
         toast.error(result.message || 'Invalid OTP. Please try again.');
@@ -163,41 +143,57 @@ const EligibilityCheck = () => {
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.pancard.trim()) {
+    // Validate Pancard
+    const pancard = (formData.pancard || '').toString().trim();
+    if (!pancard) {
       newErrors.pancard = 'Pancard is required';
-    } else if (formData.pancard.length !== 10) {
-      newErrors.pancard = 'Pancard must be 10 characters';
+    } else if (pancard.length !== 10) {
+      newErrors.pancard = 'Pancard must be exactly 10 characters';
     }
     
-    if (!formData.dob.trim()) {
+    // Validate DOB
+    const dob = (formData.dob || '').toString().trim();
+    if (!dob) {
       newErrors.dob = 'Date of Birth is required';
     }
     
-    if (!formData.personalEmail.trim()) {
+    // Validate Personal Email
+    const personalEmail = (formData.personalEmail || '').toString().trim();
+    if (!personalEmail) {
       newErrors.personalEmail = 'Personal Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.personalEmail)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personalEmail)) {
       newErrors.personalEmail = 'Invalid email format';
     }
     
+    // Validate Employment Type specific fields
     if (formData.employmentType === 'SALARIED') {
-      if (!formData.companyName.trim()) {
-        newErrors.companyName = 'Company Name is required';
+      const companyName = (formData.companyName || '').toString().trim();
+      if (!companyName) {
+        newErrors.companyName = 'Company Name is required for salaried employees';
       }
-      if (!formData.nextSalaryDate.trim()) {
-        newErrors.nextSalaryDate = 'Next Salary Date is required';
+      const nextSalaryDate = (formData.nextSalaryDate || '').toString().trim();
+      if (!nextSalaryDate) {
+        newErrors.nextSalaryDate = 'Next Salary Date is required for salaried employees';
       }
     }
     
-    if (!formData.netMonthlyIncome.trim()) {
+    // Validate Net Monthly Income
+    const netMonthlyIncome = (formData.netMonthlyIncome || '').toString().trim();
+    if (!netMonthlyIncome) {
       newErrors.netMonthlyIncome = 'Net Monthly Income is required';
-    } else if (isNaN(formData.netMonthlyIncome) || parseFloat(formData.netMonthlyIncome) < 0) {
-      newErrors.netMonthlyIncome = 'Invalid income amount';
+    } else {
+      const income = parseFloat(netMonthlyIncome);
+      if (isNaN(income) || income < 0) {
+        newErrors.netMonthlyIncome = 'Please enter a valid income amount (must be a positive number)';
+      }
     }
     
-    if (!formData.pinCode.trim()) {
+    // Validate Pin Code
+    const pinCode = (formData.pinCode || '').toString().trim();
+    if (!pinCode) {
       newErrors.pinCode = 'Pin Code is required';
-    } else if (!/^\d{6}$/.test(formData.pinCode)) {
-      newErrors.pinCode = 'Pin Code must be 6 digits';
+    } else if (!/^\d{6}$/.test(pinCode)) {
+      newErrors.pinCode = 'Pin Code must be exactly 6 digits';
     }
     
     setErrors(newErrors);
@@ -207,8 +203,26 @@ const EligibilityCheck = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validateForm()) {
-      toast.error('Please fill all required fields correctly');
+    // Validate form and get errors
+    const isValid = validateForm();
+    if (!isValid) {
+      // Show specific error messages
+      const errorMessages = Object.values(errors).filter(msg => msg);
+      if (errorMessages.length > 0) {
+        toast.error(`Please fix the following: ${errorMessages.join(', ')}`);
+      } else {
+        toast.error('Please fill all required fields correctly');
+      }
+      
+      // Scroll to first error field
+      const firstErrorField = Object.keys(errors)[0];
+      if (firstErrorField) {
+        const element = document.querySelector(`[name="${firstErrorField}"]`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.focus();
+        }
+      }
       return;
     }
 
