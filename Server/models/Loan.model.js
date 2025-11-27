@@ -20,8 +20,8 @@ const loanSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['Personal', 'Business', 'Home', 'Vehicle', 'Education'],
     required: true
+    // Removed enum constraint to allow dynamic categories from Loan Categories section
   },
   description: {
     type: String,
