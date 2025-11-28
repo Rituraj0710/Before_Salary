@@ -14,7 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 const ApplyLoan = () => {
-  const { user, sendOTP, verifyOTP } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const loanId = searchParams.get('loanId');
@@ -23,9 +23,6 @@ const ApplyLoan = () => {
   const [loans, setLoans] = useState([]);
   const [selectedLoan, setSelectedLoan] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpVerified, setOtpVerified] = useState(false);
-  const [otp, setOtp] = useState('');
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [categoryError, setCategoryError] = useState(null);
@@ -127,6 +124,20 @@ const ApplyLoan = () => {
     }
   }, [loanId]);
 
+  // Refetch dynamic fields when selectedLoan changes
+  useEffect(() => {
+    if (selectedLoan) {
+      const categoryId = selectedLoan.category?._id || selectedLoan.category || null;
+      if (categoryId) {
+        console.log('Selected loan changed, fetching fields for category:', categoryId);
+        fetchDynamicFields(categoryId);
+      } else {
+        console.warn('Selected loan has no category:', selectedLoan.name);
+        setDynamicFields([]);
+      }
+    }
+  }, [selectedLoan?._id, selectedLoan?.category]);
+
   useEffect(() => {
     fetchCategories();
   }, []);
@@ -156,8 +167,14 @@ const ApplyLoan = () => {
       if (loan) {
         setSelectedLoan(loan);
         // Fetch dynamic fields for the loan's category
-        if (loan.category?._id || loan.category) {
-          fetchDynamicFields(loan.category._id || loan.category);
+        // Handle both populated category object and category ID string
+        const categoryId = loan.category?._id || loan.category || null;
+        if (categoryId) {
+          console.log('Fetching dynamic fields for category:', categoryId);
+          fetchDynamicFields(categoryId);
+        } else {
+          console.warn('Loan has no category assigned:', loan.name);
+          setDynamicFields([]);
         }
       }
     } catch (error) {
@@ -166,13 +183,26 @@ const ApplyLoan = () => {
   };
 
   const fetchDynamicFields = async (categoryId) => {
-    if (!categoryId) return;
+    if (!categoryId) {
+      console.warn('No categoryId provided to fetchDynamicFields');
+      setDynamicFields([]);
+      return;
+    }
     try {
       setLoadingFields(true);
+      console.log('Fetching form fields for categoryId:', categoryId);
       const response = await api.get(`/form-fields/category/${categoryId}`);
-      setDynamicFields(response.data.data || []);
+      const fields = response.data.data || [];
+      console.log('Fetched dynamic fields:', fields.length, 'fields');
+      console.log('Fields by section:', {
+        employment: fields.filter(f => f.section === 'employment').length,
+        loanDetails: fields.filter(f => f.section === 'loanDetails').length,
+        documents: fields.filter(f => f.section === 'documents').length
+      });
+      setDynamicFields(fields);
     } catch (error) {
       console.error('Error fetching dynamic fields:', error);
+      console.error('Error details:', error.response?.data);
       setDynamicFields([]);
     } finally {
       setLoadingFields(false);
@@ -410,30 +440,9 @@ const ApplyLoan = () => {
     }
   };
 
-  const handleSendOTP = async () => {
-    const result = await sendOTP(formData.personalInfo.email, formData.personalInfo.phone, 'application');
-    if (result.success) {
-      setOtpSent(true);
-      toast.success('OTP sent successfully!');
-    }
-  };
-
-  const handleVerifyOTP = async () => {
-    const result = await verifyOTP(formData.personalInfo.email, formData.personalInfo.phone, otp, 'application');
-    if (result.success) {
-      setOtpVerified(true);
-      toast.success('OTP verified successfully!');
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!otpVerified) {
-      toast.error('Please verify OTP first');
-      return;
-    }
-
     setLoading(true);
     try {
       const formDataToSend = new FormData();
@@ -778,9 +787,13 @@ const ApplyLoan = () => {
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 gap-6">
-                    {dynamicFields
-                      .filter(f => f.section === 'employment')
-                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    {(() => {
+                      const employmentFields = dynamicFields
+                        .filter(f => f.section === 'employment')
+                        .sort((a, b) => (a.order || 0) - (b.order || 0));
+                      console.log('Employment fields:', employmentFields.length, employmentFields);
+                      return employmentFields;
+                    })()
                       .map((field) => (
                         <div key={field._id} className={field.width === 'half' ? 'md:col-span-1' : 'md:col-span-2'}>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -808,61 +821,11 @@ const ApplyLoan = () => {
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">Loan Details</h2>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Loan Type *
-                  </label>
-                  <select
-                    required
-                    value={formData.loanId}
-                    onChange={(e) => {
-                      setFormData({ ...formData, loanId: e.target.value });
-                      const loan = filteredLoans.find(l => l._id === e.target.value);
-                      setSelectedLoan(loan || null);
-                      // Fetch dynamic fields when loan is selected
-                      if (loan?.category?._id || loan?.category) {
-                        fetchDynamicFields(loan.category._id || loan.category);
-                      } else {
-                        setDynamicFields([]);
-                      }
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Select Loan Type</option>
-                    {filteredLoans.map((loan) => (
-                      <option key={loan._id} value={loan._id}>
-                        {loan.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Category Selection */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Loan Category
-                  </label>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => {
-                      setSelectedCategory(e.target.value);
-                      // Clear selected loan when category changes
-                      setFormData(f => ({ ...f, loanId: '' }));
-                      setSelectedLoan(null);
-                      setDynamicFields([]);
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Categories</option>
-                    {categories.map(c => (
-                      <option key={c._id} value={c._id}>{c.name} ({c.loanCount || 0})</option>
-                    ))}
-                  </select>
-                  {categoryError && <p className="text-xs text-red-600 mt-2">{categoryError}</p>}
-                </div>
-
                 {selectedLoan && (
                   <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                    <p className="text-sm text-gray-600 mb-2">
+                      <strong>Loan Type:</strong> {selectedLoan.name}
+                    </p>
                     <p className="text-sm text-gray-600 mb-2">
                       <strong>Category:</strong> {selectedLoan.category?.name || 'Uncategorized'}
                     </p>
@@ -870,10 +833,10 @@ const ApplyLoan = () => {
                       <strong>Interest Rate:</strong> {selectedLoan.interestRate?.min}% - {selectedLoan.interestRate?.max}%
                     </p>
                     <p className="text-sm text-gray-600 mb-2">
-                      <strong>Loan Amount Range:</strong> ₹{selectedLoan.minLoanAmount?.toLocaleString()} - ₹{selectedLoan.maxLoanAmount?.toLocaleString()}
+                      <strong>Loan Amount Range:</strong> ₹{selectedLoan.minLoanAmount?.toLocaleString() || '0'} - ₹{selectedLoan.maxLoanAmount?.toLocaleString() || '0'}
                     </p>
                     <p className="text-sm text-gray-600">
-                      <strong>Tenure:</strong> {selectedLoan.minTenure} - {selectedLoan.maxTenure} months
+                      <strong>Tenure:</strong> {selectedLoan.minTenure || 0} - {selectedLoan.maxTenure || 0} months
                     </p>
                   </div>
                 )}
@@ -885,9 +848,13 @@ const ApplyLoan = () => {
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 gap-6">
-                    {dynamicFields
-                      .filter(f => f.section === 'loanDetails')
-                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    {(() => {
+                      const loanDetailsFields = dynamicFields
+                        .filter(f => f.section === 'loanDetails')
+                        .sort((a, b) => (a.order || 0) - (b.order || 0));
+                      console.log('Loan Details fields:', loanDetailsFields.length, loanDetailsFields);
+                      return loanDetailsFields;
+                    })()
                       .map((field) => (
                         <div key={field._id} className={field.width === 'half' ? 'md:col-span-1' : 'md:col-span-2'}>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -910,12 +877,12 @@ const ApplyLoan = () => {
               </div>
             )}
 
-            {/* Step 5: Documents & OTP Verification */}
+            {/* Step 5: Documents */}
             {step === 5 && (
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
                   <DocumentIcon className="h-6 w-6 mr-2" />
-                  Documents & Verify
+                  Documents
                 </h2>
 
                 {loadingFields ? (
@@ -925,9 +892,13 @@ const ApplyLoan = () => {
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 gap-6">
-                    {dynamicFields
-                      .filter(f => f.section === 'documents')
-                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    {(() => {
+                      const documentsFields = dynamicFields
+                        .filter(f => f.section === 'documents')
+                        .sort((a, b) => (a.order || 0) - (b.order || 0));
+                      console.log('Documents fields:', documentsFields.length, documentsFields);
+                      return documentsFields;
+                    })()
                       .map((field) => (
                         <div key={field._id} className={field.width === 'half' ? 'md:col-span-1' : 'md:col-span-2'}>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -947,48 +918,6 @@ const ApplyLoan = () => {
                     )}
                   </div>
                 )}
-
-                {/* OTP Verification */}
-                <div className="bg-gray-50 p-6 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-4">OTP Verification</h3>
-                  {!otpSent ? (
-                    <button
-                      type="button"
-                      onClick={handleSendOTP}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
-                    >
-                      Send OTP
-                    </button>
-                  ) : !otpVerified ? (
-                    <div className="space-y-4">
-                      <p className="text-sm text-gray-600">
-                        OTP sent to {formData.personalInfo.email} and {formData.personalInfo.phone}
-                      </p>
-                      <div className="flex gap-4">
-                        <input
-                          type="text"
-                          value={otp}
-                          onChange={(e) => setOtp(e.target.value)}
-                          placeholder="Enter OTP"
-                          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          maxLength="6"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleVerifyOTP}
-                          className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
-                        >
-                          Verify OTP
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center text-green-600">
-                      <CheckCircleIcon className="h-6 w-6 mr-2" />
-                      <span>OTP Verified Successfully</span>
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 
@@ -1015,7 +944,7 @@ const ApplyLoan = () => {
               ) : (
                 <button
                   type="submit"
-                  disabled={loading || !otpVerified}
+                  disabled={loading}
                   className="flex items-center px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Submitting...' : 'Submit Application'}

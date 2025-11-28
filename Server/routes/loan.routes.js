@@ -34,7 +34,9 @@ const uploadWithErrorHandling = (uploadMiddleware) => {
 // @access  Public
 router.get('/', async (req, res) => {
   try {
-    const loans = await Loan.find({ isActive: true }).sort({ order: 1 });
+    const loans = await Loan.find({ isActive: true })
+      .populate('category', 'name _id')
+      .sort({ order: 1 });
     res.json({
       success: true,
       count: loans.length,
@@ -139,15 +141,20 @@ router.post('/', protect, uploadWithErrorHandling(upload.any()), async (req, res
 
     // Handle file upload - check both req.file (single) and req.files (any)
     let fileUrl = null;
+    console.log('File upload check - req.files:', req.files ? req.files.length : 'none', 'req.file:', req.file ? req.file.filename : 'none');
     if (req.files && req.files.length > 0) {
+      console.log('Available files:', req.files.map(f => ({ fieldname: f.fieldname, filename: f.filename })));
       const uploadedFile = req.files.find(f => f.fieldname === 'file');
       if (uploadedFile) {
         fileUrl = `/uploads/${uploadedFile.filename}`;
-        console.log('File uploaded for loan:', uploadedFile.filename);
+        console.log('✅ File uploaded for loan:', uploadedFile.filename, 'URL:', fileUrl);
+      } else {
+        console.log('⚠️ No file with fieldname "file" found. Available fieldnames:', req.files.map(f => f.fieldname));
       }
     }
     if (!fileUrl) {
       fileUrl = req.body.image || '';
+      console.log('No file uploaded, using image from body or empty:', fileUrl || 'EMPTY');
     }
 
     // Prepare loan data - start with req.body
@@ -157,6 +164,9 @@ router.post('/', protect, uploadWithErrorHandling(upload.any()), async (req, res
       image: fileUrl || req.body.image || '',
       user: req.user._id // Add user ID from authenticated user
     };
+    
+    console.log('File URL set to:', fileUrl);
+    console.log('Loan data image field:', loanData.image);
 
     console.log('Parsed loanData before processing:', {
       name: loanData.name,
@@ -384,6 +394,7 @@ router.post('/', protect, uploadWithErrorHandling(upload.any()), async (req, res
       minTenure: finalLoanData.minTenure,
       maxTenure: finalLoanData.maxTenure,
       description: finalLoanData.description ? 'present' : 'missing',
+      image: finalLoanData.image || 'NO IMAGE',
       hasUser: !!finalLoanData.user
     });
 
@@ -441,6 +452,15 @@ router.put('/:id', protect, uploadWithErrorHandling(upload.single('file')), asyn
       });
     }
 
+    // Get existing loan to preserve image if no new file is uploaded
+    const existingLoan = await Loan.findById(req.params.id);
+    if (!existingLoan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Loan not found'
+      });
+    }
+
     // Handle file upload
     let fileUrl = null;
     if (req.file) {
@@ -450,8 +470,14 @@ router.put('/:id', protect, uploadWithErrorHandling(upload.single('file')), asyn
 
     // Prepare loan data
     const loanData = { ...req.body };
+    // Set image: use new file if uploaded, otherwise preserve existing, or use from body if provided
     if (fileUrl) {
       loanData.image = fileUrl;
+    } else if (req.body.image !== undefined) {
+      loanData.image = req.body.image;
+    } else {
+      // Preserve existing image if no new file and no image in body
+      loanData.image = existingLoan.image || '';
     }
 
     // Parse nested objects if they're strings (from FormData)
@@ -504,13 +530,6 @@ router.put('/:id', protect, uploadWithErrorHandling(upload.single('file')), asyn
       loanData,
       { new: true, runValidators: true }
     );
-
-    if (!loan) {
-      return res.status(404).json({
-        success: false,
-        message: 'Loan not found'
-      });
-    }
 
     res.json({
       success: true,
