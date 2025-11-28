@@ -34,7 +34,9 @@ const uploadWithErrorHandling = (uploadMiddleware) => {
 // @access  Public
 router.get('/', async (req, res) => {
   try {
-    const loans = await Loan.find({ isActive: true }).sort({ order: 1 });
+    const loans = await Loan.find({ isActive: true })
+      .populate('category', 'name _id')
+      .sort({ order: 1 });
     res.json({
       success: true,
       count: loans.length,

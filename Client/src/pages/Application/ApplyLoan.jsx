@@ -124,6 +124,20 @@ const ApplyLoan = () => {
     }
   }, [loanId]);
 
+  // Refetch dynamic fields when selectedLoan changes
+  useEffect(() => {
+    if (selectedLoan) {
+      const categoryId = selectedLoan.category?._id || selectedLoan.category || null;
+      if (categoryId) {
+        console.log('Selected loan changed, fetching fields for category:', categoryId);
+        fetchDynamicFields(categoryId);
+      } else {
+        console.warn('Selected loan has no category:', selectedLoan.name);
+        setDynamicFields([]);
+      }
+    }
+  }, [selectedLoan?._id, selectedLoan?.category]);
+
   useEffect(() => {
     fetchCategories();
   }, []);
@@ -153,8 +167,14 @@ const ApplyLoan = () => {
       if (loan) {
         setSelectedLoan(loan);
         // Fetch dynamic fields for the loan's category
-        if (loan.category?._id || loan.category) {
-          fetchDynamicFields(loan.category._id || loan.category);
+        // Handle both populated category object and category ID string
+        const categoryId = loan.category?._id || loan.category || null;
+        if (categoryId) {
+          console.log('Fetching dynamic fields for category:', categoryId);
+          fetchDynamicFields(categoryId);
+        } else {
+          console.warn('Loan has no category assigned:', loan.name);
+          setDynamicFields([]);
         }
       }
     } catch (error) {
@@ -163,13 +183,26 @@ const ApplyLoan = () => {
   };
 
   const fetchDynamicFields = async (categoryId) => {
-    if (!categoryId) return;
+    if (!categoryId) {
+      console.warn('No categoryId provided to fetchDynamicFields');
+      setDynamicFields([]);
+      return;
+    }
     try {
       setLoadingFields(true);
+      console.log('Fetching form fields for categoryId:', categoryId);
       const response = await api.get(`/form-fields/category/${categoryId}`);
-      setDynamicFields(response.data.data || []);
+      const fields = response.data.data || [];
+      console.log('Fetched dynamic fields:', fields.length, 'fields');
+      console.log('Fields by section:', {
+        employment: fields.filter(f => f.section === 'employment').length,
+        loanDetails: fields.filter(f => f.section === 'loanDetails').length,
+        documents: fields.filter(f => f.section === 'documents').length
+      });
+      setDynamicFields(fields);
     } catch (error) {
       console.error('Error fetching dynamic fields:', error);
+      console.error('Error details:', error.response?.data);
       setDynamicFields([]);
     } finally {
       setLoadingFields(false);
@@ -754,9 +787,13 @@ const ApplyLoan = () => {
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 gap-6">
-                    {dynamicFields
-                      .filter(f => f.section === 'employment')
-                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    {(() => {
+                      const employmentFields = dynamicFields
+                        .filter(f => f.section === 'employment')
+                        .sort((a, b) => (a.order || 0) - (b.order || 0));
+                      console.log('Employment fields:', employmentFields.length, employmentFields);
+                      return employmentFields;
+                    })()
                       .map((field) => (
                         <div key={field._id} className={field.width === 'half' ? 'md:col-span-1' : 'md:col-span-2'}>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -811,9 +848,13 @@ const ApplyLoan = () => {
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 gap-6">
-                    {dynamicFields
-                      .filter(f => f.section === 'loanDetails')
-                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    {(() => {
+                      const loanDetailsFields = dynamicFields
+                        .filter(f => f.section === 'loanDetails')
+                        .sort((a, b) => (a.order || 0) - (b.order || 0));
+                      console.log('Loan Details fields:', loanDetailsFields.length, loanDetailsFields);
+                      return loanDetailsFields;
+                    })()
                       .map((field) => (
                         <div key={field._id} className={field.width === 'half' ? 'md:col-span-1' : 'md:col-span-2'}>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -851,9 +892,13 @@ const ApplyLoan = () => {
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 gap-6">
-                    {dynamicFields
-                      .filter(f => f.section === 'documents')
-                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    {(() => {
+                      const documentsFields = dynamicFields
+                        .filter(f => f.section === 'documents')
+                        .sort((a, b) => (a.order || 0) - (b.order || 0));
+                      console.log('Documents fields:', documentsFields.length, documentsFields);
+                      return documentsFields;
+                    })()
                       .map((field) => (
                         <div key={field._id} className={field.width === 'half' ? 'md:col-span-1' : 'md:col-span-2'}>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
