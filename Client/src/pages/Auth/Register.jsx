@@ -11,6 +11,7 @@ const Register = () => {
     confirmPassword: ''
   });
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -23,6 +24,8 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    setErrorMessage('');
 
     if (formData.password !== formData.confirmPassword) {
       alert('Passwords do not match');
@@ -45,6 +48,12 @@ const Register = () => {
 
     if (result.success) {
       navigate('/dashboard');
+    } else if (result.message) {
+      if (result.message.toLowerCase().includes('already exists')) {
+        setErrorMessage('An account with this email or phone already exists. Please sign in instead.');
+      } else {
+        setErrorMessage(result.message);
+      }
     }
   };
 
@@ -60,6 +69,11 @@ const Register = () => {
             sign in to your existing account
           </Link>
         </p>
+        {errorMessage && (
+          <p className="mt-2 text-center text-sm text-red-600">
+            {errorMessage}
+          </p>
+        )}
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">

@@ -166,6 +166,144 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// @route   POST /api/auth/forgot-password
+// @desc    Send password reset OTP to user's email
+// @access  Public
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email',
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found with this email',
+      });
+    }
+
+    const pre = smtpPreflight();
+    if (!pre.ok) {
+      return res.status(500).json({
+        success: false,
+        message: 'SMTP credentials/config incomplete.',
+        missing: pre.missing,
+        empty: pre.empty,
+        ...(pre.gmailHint && { gmailHint: pre.gmailHint }),
+      });
+    }
+
+    const otp = generateOTP();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    user.otp = {
+      code: otp,
+      expiresAt,
+      purpose: 'password_reset',
+    };
+    await user.save();
+
+    let emailResult;
+    try {
+      emailResult = await sendOTPEmail(email, otp, 'password reset');
+    } catch (err) {
+      emailResult = { success: false, error: err.message, code: err.code };
+    }
+
+    if (!emailResult.success) {
+      const authFail =
+        emailResult.code === 'EAUTH' ||
+        /auth/i.test(emailResult.error || '');
+      const baseMessage = authFail
+        ? 'SMTP authentication failed.'
+        : emailResult.error || 'Failed to send reset email.';
+
+      return res.status(500).json({
+        success: false,
+        message: baseMessage,
+        code: emailResult.code,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message:
+        'Password reset OTP has been sent to your email. It will expire in 10 minutes.',
+    });
+  } catch (error) {
+    console.error('[FORGOT_PASSWORD_FATAL]', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Server error',
+    });
+  }
+});
+
+// @route   POST /api/auth/reset-password
+// @desc    Reset password using email + OTP
+// @access  Public
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide email, OTP and new password',
+      });
+    }
+
+    const user = await User.findOne({ email }).select('+password');
+
+    if (!user || !user.otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP or user not found',
+      });
+    }
+
+    if (
+      user.otp.purpose !== 'password_reset' ||
+      user.otp.code !== otp
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid OTP',
+      });
+    }
+
+    if (new Date() > user.otp.expiresAt) {
+      return res.status(400).json({
+        success: false,
+        message: 'OTP has expired',
+      });
+    }
+
+    // Set new password and clear OTP
+    user.password = newPassword;
+    user.otp = undefined;
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: 'Password has been reset successfully. You can now log in.',
+    });
+  } catch (error) {
+    console.error('[RESET_PASSWORD_FATAL]', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Server error',
+    });
+  }
+});
+
 // @route   POST /api/auth/send-otp
 // @desc    Send OTP for email/phone verification or login
 // @access  Public

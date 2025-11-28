@@ -251,17 +251,7 @@ const NavigationManagement = () => {
                   placeholder="HomeIcon"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Order</label>
-                  <input
-                    type="number"
-                    value={formData.order}
-                    onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-                <div className="flex items-center space-x-4 pt-6">
+              <div className="flex items-center space-x-4 pt-2">
                   <label className="flex items-center">
                     <input
                       type="checkbox"
@@ -280,7 +270,6 @@ const NavigationManagement = () => {
                     />
                     <span className="text-sm font-medium text-gray-700">Public</span>
                   </label>
-                </div>
               </div>
               <div className="flex justify-end space-x-3 pt-4">
                 <button

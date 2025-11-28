@@ -71,28 +71,41 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // const register = async (name, email, phone, password) => {
-  //   try {
-  //     const response = await api.post('/auth/register', {
-  //       name,
-  //       email,
-  //       phone,
-  //       password,
-  //     });
-  //     const { token, user: userData } = response.data;
-      
-  //     localStorage.setItem('token', token);
-  //     localStorage.setItem('user', JSON.stringify(userData));
-  //     setUser(userData);
-  //     setIsAuthenticated(true);
-  //     toast.success('Registration successful!');
-  //     return { success: true };
-  //   } catch (error) {
-  //     const message = error.response?.data?.message || 'Registration failed';
-  //     toast.error(message);
-  //     return { success: false, message };
-  //   }
-  // };
+  const register = async (name, email, phone, password) => {
+    try {
+      const response = await api.post('/auth/register', {
+        name,
+        email,
+        phone,
+        password,
+      });
+
+      if (response.data.success === false) {
+        const message = response.data.message || 'Registration failed';
+        toast.error(message);
+        return { success: false, message };
+      }
+
+      const { token, user: userData } = response.data;
+
+      if (!token || !userData) {
+        const message = 'Invalid response from server';
+        toast.error(message);
+        return { success: false, message };
+      }
+
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
+      setIsAuthenticated(true);
+      toast.success('Registration successful!');
+      return { success: true, user: userData };
+    } catch (error) {
+      const message = error.response?.data?.message || 'Registration failed';
+      toast.error(message);
+      return { success: false, message };
+    }
+  };
 
   const logout = () => {
     localStorage.removeItem('token');
@@ -207,16 +220,41 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const resetPassword = async (email, otp, newPassword) => {
+    try {
+      const response = await api.post('/auth/reset-password', {
+        email,
+        otp,
+        newPassword,
+      });
+
+      if (response.data.success) {
+        toast.success(response.data.message || 'Password reset successful');
+        return { success: true };
+      }
+
+      toast.error(response.data.message || 'Password reset failed');
+      return { success: false, message: response.data.message };
+    } catch (error) {
+      const message =
+        error.response?.data?.message || 'Password reset failed';
+      toast.error(message);
+      return { success: false, message };
+    }
+  };
+
   const value = {
     user,
     loading,
     isAuthenticated,
     login,
+    register,
     logout,
     sendOTP,
     verifyOTP,
     loginWithFirebase,
     isClientVerified, // export this for use in components if needed
+    resetPassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

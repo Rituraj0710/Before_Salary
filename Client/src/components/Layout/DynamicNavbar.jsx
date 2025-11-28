@@ -83,6 +83,8 @@ const DynamicNavbar = () => {
         { label: 'Repay Loan', path: '/repay', isPublic: true },
         { label: 'Contact Us', path: '/contact', isPublic: true }
       ]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -110,7 +112,7 @@ const DynamicNavbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6">
-            {!loading && publicNavItems.map((item) => (
+            {publicNavItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path || '/'}

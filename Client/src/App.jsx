@@ -9,6 +9,7 @@ import FloatingButtons from './components/Layout/FloatingButtons';
 import Home from './pages/Home';
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
+import ForgotPassword from './pages/Auth/ForgotPassword';
 import Dashboard from './pages/Dashboard/Dashboard';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import LoansPage from './pages/Loans/LoansPage';
@@ -108,6 +109,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/loans" element={<LoansPage />} />
             <Route path="/loans/:slug" element={<LoanDetail />} />
             <Route path="/about" element={<About />} />

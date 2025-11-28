@@ -18,6 +18,9 @@ import LogoSettings from './LogoSettings';
 import AuthenticationSettings from './AuthenticationSettings';
 import FAQManagement from './FAQManagement';
 import Categories from './Categories';
+import UserFormLoanDetail from './UserFormLoanDetail';
+import VerifiedUsers from './VerifiedUsers';
+import EligibilityManagement from './EligibilityManagement';
 
 const AdminDashboard = () => {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -265,6 +268,11 @@ const AdminDashboard = () => {
         </>
       )}
 
+      {/* Verified Users Tab */}
+      {activeTab === 'verified-users' && (
+        <VerifiedUsers />
+      )}
+
       {/* Loan Management Tab */}
       {activeTab === 'loans' && (
         <LoanManagement />
@@ -305,28 +313,26 @@ const AdminDashboard = () => {
         <Categories />
       )}
 
-      {/* Settings Tab */}
-      {activeTab === 'settings' && (
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Site Settings</h2>
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-gray-600">Site settings coming soon...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Content Management Tab */}
-      {activeTab === 'content' && (
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Content Management</h2>
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-gray-600">Content management coming soon...</p>
-          </div>
-        </div>
+      {/* Eligibility Management Tab */}
+      {activeTab === 'eligibility' && (
+        <EligibilityManagement />
       )}
 
       {/* Fallback for unknown tabs */}
-      {!['dashboard','loans','home-loan-cards','hero-banner','logo','navigation','home-content','authentication','faq','settings','content','categories','loan-categories'].includes(activeTab) && (
+      {![
+        'dashboard',
+        'verified-users',
+        'loans',
+        'user-form-loan-detail',
+        'hero-banner',
+        'logo-settings',
+        'navigation',
+        'authentication',
+        'faq',
+        'categories',
+        'loan-categories',
+        'eligibility'
+      ].includes(activeTab) && (
         <div className="bg-white rounded-lg shadow p-6">
           <p className="text-gray-600">No content for this section.</p>
         </div>

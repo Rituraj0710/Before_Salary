@@ -14,8 +14,6 @@ import {
   CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
-import Users from './Users';
-import { Routes, Route } from 'react-router-dom';
 
 const AdminLayout = ({ children, activeTab, setActiveTab }) => {
   const { user, logout } = useAuth();
@@ -29,7 +27,7 @@ const AdminLayout = ({ children, activeTab, setActiveTab }) => {
 
   const tabs = [
     { id: 'dashboard', name: 'Dashboard', icon: HomeIcon },
-    { id: 'users', name: 'Verified Users', icon: UserIcon },
+    { id: 'verified-users', name: 'Verified Users', icon: UserIcon },
     { id: 'loans', name: 'Loan Management', icon: CreditCardIcon },
     { id: 'categories', name: 'Loan Categories', icon: Cog6ToothIcon },
     { id: 'eligibility', name: 'Eligibility Management', icon: CheckCircleIcon },
@@ -109,9 +107,6 @@ const AdminLayout = ({ children, activeTab, setActiveTab }) => {
 
         {/* Main Content */}
         <main className="flex-1 p-6">
-          <Routes>
-            <Route path="users" element={<Users />} />
-          </Routes>
           {children}
         </main>
       </div>
