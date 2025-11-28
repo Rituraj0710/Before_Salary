@@ -8,6 +8,8 @@ import HomeInfoCard from '../models/HomeInfoCard.model.js';
 import HomeBenefitCard from '../models/HomeBenefitCard.model.js';
 import { protect, authorize } from '../middleware/auth.middleware.js';
 import { uploadImage } from '../utils/upload.js';
+import cloudinary from '../utils/cloudinary.js';
+import fs from 'fs';
 
 const router = express.Router();
 
@@ -158,7 +160,8 @@ router.get('/applications', async (req, res) => {
 // @access  Private/Admin
 router.get('/settings', async (req, res) => {
   try {
-    let settings = await AdminSettings.findOne();
+    // Always use the latest settings document
+    let settings = await AdminSettings.findOne().sort({ createdAt: -1 });
 
     if (!settings) {
       // Create default settings if none exist
@@ -189,10 +192,39 @@ router.post('/upload-logo', uploadImage.single('logo'), async (req, res) => {
       });
     }
 
-    const logoUrl = `/uploads/${req.file.filename}`;
+    // Decide whether to use Cloudinary or local storage based on env configuration
+    const hasCloudinaryConfig =
+      process.env.CLOUDINARY_CLOUD_NAME &&
+      process.env.CLOUDINARY_API_KEY &&
+      process.env.CLOUDINARY_API_SECRET;
+
+    let logoUrl;
+    let cloudinaryResult = null;
+
+    if (hasCloudinaryConfig) {
+      // Upload the image file from local disk (saved by multer) to Cloudinary
+      cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+        folder: 'beforesalary/branding',
+        resource_type: 'image'
+      });
+
+      logoUrl = cloudinaryResult.secure_url;
+
+      // Remove the local file after successful upload
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        // Log and ignore cleanup errors – they shouldn't block the response
+        console.error('Error deleting local logo file:', cleanupError);
+      }
+    } else {
+      // Fallback: use local uploads folder if Cloudinary is not configured
+      logoUrl = `/uploads/${req.file.filename}`;
+    }
     
-    // Update settings with new logo
-    let settings = await AdminSettings.findOne();
+    // Update settings with new logo (store Cloudinary URL)
+    // Use the latest settings document to avoid stale records
+    let settings = await AdminSettings.findOne().sort({ createdAt: -1 });
     if (!settings) {
       settings = await AdminSettings.create({ siteLogo: logoUrl });
     } else {
@@ -204,11 +236,12 @@ router.post('/upload-logo', uploadImage.single('logo'), async (req, res) => {
       success: true,
       message: 'Logo uploaded successfully',
       data: {
-        logoUrl: logoUrl,
-        filename: req.file.filename
+        logoUrl,
+        publicId: cloudinaryResult ? cloudinaryResult.public_id : null
       }
     });
   } catch (error) {
+    console.error('Error uploading logo:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to upload logo'
@@ -221,13 +254,14 @@ router.post('/upload-logo', uploadImage.single('logo'), async (req, res) => {
 // @access  Private/Admin
 router.put('/settings', async (req, res) => {
   try {
-    let settings = await AdminSettings.findOne();
+    // Always update the latest settings document
+    let settings = await AdminSettings.findOne().sort({ createdAt: -1 });
 
     if (!settings) {
       settings = await AdminSettings.create(req.body);
     } else {
-      settings = await AdminSettings.findOneAndUpdate(
-        {},
+      settings = await AdminSettings.findByIdAndUpdate(
+        settings._id,
         req.body,
         { new: true, runValidators: true }
       );
@@ -303,11 +337,40 @@ router.get('/loans', async (req, res) => {
 // @access  Private/Admin
 router.get('/navigation', async (req, res) => {
   try {
-    const settings = await AdminSettings.findOne();
-    const navigation = settings?.navigation || [];
+    let settings = await AdminSettings.findOne();
+    
+    // Default navigation items
+    const defaultNavigation = [
+      { label: 'Home', path: '/', isPublic: true, isVisible: true, order: 1 },
+      { label: 'About Us', path: '/about', isPublic: true, isVisible: true, order: 2 },
+      { label: 'Loans', path: '/loans', isPublic: true, isVisible: true, order: 3 },
+      { label: 'FAQs', path: '/faq', isPublic: true, isVisible: true, order: 4 },
+      { label: 'Repay Loan', path: '/repay', isPublic: true, isVisible: true, order: 5 },
+      { label: 'Contact Us', path: '/contact', isPublic: true, isVisible: true, order: 6 }
+    ];
+    
+    if (!settings) {
+      // Create settings with default navigation
+      settings = await AdminSettings.create({ navigation: defaultNavigation });
+      return res.json({
+        success: true,
+        data: defaultNavigation
+      });
+    }
+    
+    // If navigation is empty or doesn't exist, initialize with defaults
+    if (!settings.navigation || settings.navigation.length === 0) {
+      settings.navigation = defaultNavigation;
+      await settings.save();
+      return res.json({
+        success: true,
+        data: defaultNavigation
+      });
+    }
+    
     res.json({
       success: true,
-      data: navigation
+      data: settings.navigation
     });
   } catch (error) {
     res.status(500).json({
@@ -331,13 +394,29 @@ router.post('/navigation', async (req, res) => {
       settings.navigation = [];
     }
     
-    settings.navigation.push(req.body);
+    // Create new navigation item with proper structure
+    const newItem = {
+      label: req.body.label,
+      path: req.body.path,
+      icon: req.body.icon || '',
+      order: req.body.order || settings.navigation.length + 1,
+      isVisible: req.body.isVisible !== false,
+      isPublic: req.body.isPublic !== false
+    };
+    
+    settings.navigation.push(newItem);
+    
+    // Mark the navigation array as modified to ensure MongoDB saves it
+    settings.markModified('navigation');
     await settings.save();
+    
+    // Return the newly created item with its _id
+    const createdItem = settings.navigation[settings.navigation.length - 1];
     
     res.json({
       success: true,
       message: 'Navigation item added',
-      data: settings.navigation
+      data: createdItem
     });
   } catch (error) {
     res.status(500).json({
@@ -368,7 +447,23 @@ router.put('/navigation/:id', async (req, res) => {
       });
     }
     
-    settings.navigation[itemIndex] = { ...settings.navigation[itemIndex].toObject(), ...req.body };
+    // Get the existing item and merge with updates, preserving all fields
+    const existingItem = settings.navigation[itemIndex].toObject();
+    const updatedItem = {
+      ...existingItem,
+      label: req.body.label !== undefined ? req.body.label : existingItem.label,
+      path: req.body.path !== undefined ? req.body.path : existingItem.path,
+      icon: req.body.icon !== undefined ? req.body.icon : existingItem.icon,
+      order: req.body.order !== undefined ? req.body.order : existingItem.order,
+      isVisible: req.body.isVisible !== undefined ? req.body.isVisible : existingItem.isVisible !== false,
+      isPublic: req.body.isPublic !== undefined ? req.body.isPublic : existingItem.isPublic !== false
+    };
+    
+    // Update the item in the array
+    settings.navigation[itemIndex] = updatedItem;
+    
+    // Mark the navigation array as modified to ensure MongoDB saves it
+    settings.markModified('navigation');
     await settings.save();
     
     res.json({
@@ -398,6 +493,9 @@ router.delete('/navigation/:id', async (req, res) => {
     }
     
     settings.navigation = settings.navigation.filter(item => item._id.toString() !== req.params.id);
+    
+    // Mark the navigation array as modified to ensure MongoDB saves it
+    settings.markModified('navigation');
     await settings.save();
     
     res.json({

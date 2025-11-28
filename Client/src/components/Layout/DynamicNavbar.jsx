@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../utils/api';
@@ -15,11 +15,14 @@ const DynamicNavbar = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [navItems, setNavItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [siteSettings, setSiteSettings] = useState({
     siteName: 'BeforeSalary',
     siteTagline: 'For Brighter Tomorrow',
     siteLogo: ''
   });
+  // Use a ref to store mount time for cache-busting - this ensures logo refreshes on page load
+  const mountTimeRef = useRef(Date.now());
 
   useEffect(() => {
     fetchNavSettings();
@@ -27,14 +30,26 @@ const DynamicNavbar = () => {
 
   const fetchNavSettings = async () => {
     try {
-      const response = await api.get('/content/navigation');
+      setLoading(true);
+      // Add cache-busting to the API request to ensure fresh data
+      const response = await api.get(`/content/navigation?t=${Date.now()}`);
       if (response.data.success && response.data.data) {
         const data = response.data.data;
-        // Format logo URL - if it's a relative path, make it absolute
+        // Format logo URL - convert relative paths to absolute URLs
         let logoUrl = data.siteLogo || '';
-        if (logoUrl && logoUrl.startsWith('/uploads/')) {
-          const apiBaseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
-          logoUrl = `${apiBaseUrl}${logoUrl}`;
+        if (logoUrl) {
+          // If it's already a full URL (http/https), use it as is with cache-busting
+          if (logoUrl.startsWith('http://') || logoUrl.startsWith('https://')) {
+            // Add cache-busting parameter to prevent browser caching of old logo
+            // Use mount time so it refreshes on page load but not on every render
+            const separator = logoUrl.includes('?') ? '&' : '?';
+            logoUrl = `${logoUrl}${separator}v=${mountTimeRef.current}`;
+          } else if (logoUrl.startsWith('/')) {
+            // If it's a relative path (starts with /), make it absolute
+            const apiBaseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+            // Add cache-busting parameter to prevent browser caching of old logo
+            logoUrl = `${apiBaseUrl}${logoUrl}?v=${mountTimeRef.current}`;
+          }
         }
         setSiteSettings({
           siteName: data.siteName || 'BeforeSalary',
@@ -42,35 +57,29 @@ const DynamicNavbar = () => {
           siteLogo: logoUrl
         });
         
-        // Get navigation items
-        if (data.navigation && data.navigation.length > 0) {
+        // Get navigation items - ONLY use items from backend, no static defaults
+        if (data.navigation && Array.isArray(data.navigation) && data.navigation.length > 0) {
+          // Use navigation from admin settings, filter visible items
           const visibleItems = data.navigation
             .filter(item => item.isVisible !== false)
             .sort((a, b) => (a.order || 0) - (b.order || 0));
+          
+          // Only set navigation items if we have visible items from backend
           setNavItems(visibleItems);
         } else {
-          // Default navigation if none set
-          setNavItems([
-            { label: 'Home', path: '/', isPublic: true },
-            { label: 'About Us', path: '/about', isPublic: true },
-            { label: 'Loans', path: '/loans', isPublic: true },
-            { label: 'FAQs', path: '/faq', isPublic: true },
-            { label: 'Repay Loan', path: '/repay', isPublic: true },
-            { label: 'Contact Us', path: '/contact', isPublic: true }
-          ]);
+          // If no navigation from backend, show empty array (no static defaults)
+          setNavItems([]);
         }
+      } else {
+        // If API response is not successful, show empty array
+        setNavItems([]);
       }
     } catch (error) {
       console.error('Error fetching navigation:', error);
-      // Use default navigation on error
-      setNavItems([
-        { label: 'Home', path: '/', isPublic: true },
-        { label: 'About Us', path: '/about', isPublic: true },
-        { label: 'Loans', path: '/loans', isPublic: true },
-        { label: 'FAQs', path: '/faq', isPublic: true },
-        { label: 'Repay Loan', path: '/repay', isPublic: true },
-        { label: 'Contact Us', path: '/contact', isPublic: true }
-      ]);
+      // On error, show empty array - no static defaults
+      setNavItems([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -86,22 +95,19 @@ const DynamicNavbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           {/* Logo */}
-          <Link to="/" className="flex flex-col items-start">
-            {siteSettings.siteLogo ? (
-              <img src={siteSettings.siteLogo} alt={siteSettings.siteName} className="h-12" />
-            ) : (
-              <>
-                <span className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-orange-500 bg-clip-text text-transparent">
-                  {siteSettings.siteName}
-                </span>
-                <span className="text-xs text-gray-500 mt-0.5">{siteSettings.siteTagline}</span>
-              </>
+          <Link to="/" className="flex items-center">
+            {siteSettings.siteLogo && (
+              <img
+                src={siteSettings.siteLogo}
+                alt={siteSettings.siteName || 'Site logo'}
+                className="h-12 object-contain"
+              />
             )}
           </Link>
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-6">
-            {publicNavItems.map((item) => (
+            {!loading && publicNavItems.map((item) => (
               <Link
                 key={item.path}
                 to={item.path}
@@ -163,7 +169,7 @@ const DynamicNavbar = () => {
       </div>
 
       {/* Mobile Navigation */}
-      {mobileMenuOpen && (
+      {mobileMenuOpen && !loading && (
         <div className="md:hidden bg-white border-t">
           <div className="px-4 pt-2 pb-3 space-y-1">
             {publicNavItems.map((item) => (

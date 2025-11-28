@@ -32,16 +32,11 @@ const AdminLayout = ({ children, activeTab, setActiveTab }) => {
     { id: 'loans', name: 'Loan Management', icon: CreditCardIcon },
     { id: 'categories', name: 'Loan Categories', icon: Cog6ToothIcon },
     { id: 'user-form-loan-detail', name: 'User Form – Loan Detail', icon: DocumentTextIcon },
-    { id: 'home-loan-cards', name: 'Home Loan Cards', icon: CreditCardIcon },
     { id: 'hero-banner', name: 'Hero Banner', icon: PhotoIcon },
-    { id: 'logo', name: 'Logo & Branding', icon: PhotoIcon },
+    { id: 'logo-settings', name: 'Logo Settings', icon: PhotoIcon },
     { id: 'navigation', name: 'Navigation Menu', icon: Bars3Icon },
-    { id: 'home-content', name: 'Home Content', icon: DocumentTextIcon },
     { id: 'authentication', name: 'Authentication', icon: Cog6ToothIcon },
     { id: 'faq', name: 'FAQ Management', icon: DocumentTextIcon },
-    { id: 'settings', name: 'Site Settings', icon: Cog6ToothIcon },
-    { id: 'content', name: 'Content Management', icon: DocumentTextIcon },
-
   ];
 
   return (

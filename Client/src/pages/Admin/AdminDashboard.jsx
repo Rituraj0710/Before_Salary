@@ -13,11 +13,9 @@ import toast from 'react-hot-toast';
 import AdminLayout from './AdminLayout';
 import HeroBannerEditor from './HeroBannerEditor';
 import LoanManagement from './LoanManagement';
-import LogoBranding from './LogoBranding';
 import NavigationManagement from './NavigationManagement';
+import LogoSettings from './LogoSettings';
 import AuthenticationSettings from './AuthenticationSettings';
-import HomeLoanCards from './HomeLoanCards';
-import HomeContentSettings from './HomeContentSettings';
 import FAQManagement from './FAQManagement';
 import Categories from './Categories';
 import UserFormLoanDetail from './UserFormLoanDetail';
@@ -278,29 +276,19 @@ const AdminDashboard = () => {
         <UserFormLoanDetail />
       )}
 
-      {/* Home Loan Cards Tab */}
-      {activeTab === 'home-loan-cards' && (
-        <HomeLoanCards />
-      )}
-
       {/* Hero Banner Tab */}
       {activeTab === 'hero-banner' && (
         <HeroBannerEditor />
       )}
 
-      {/* Logo & Branding Tab */}
-      {activeTab === 'logo' && (
-        <LogoBranding />
+      {/* Logo Settings Tab */}
+      {activeTab === 'logo-settings' && (
+        <LogoSettings />
       )}
 
       {/* Navigation Management Tab */}
       {activeTab === 'navigation' && (
         <NavigationManagement />
-      )}
-
-      {/* Home Content Tab */}
-      {activeTab === 'home-content' && (
-        <HomeContentSettings />
       )}
 
       {/* Authentication Settings Tab */}
@@ -318,28 +306,8 @@ const AdminDashboard = () => {
         <Categories />
       )}
 
-      {/* Settings Tab */}
-      {activeTab === 'settings' && (
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Site Settings</h2>
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-gray-600">Site settings coming soon...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Content Management Tab */}
-      {activeTab === 'content' && (
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Content Management</h2>
-          <div className="bg-white rounded-lg shadow p-6">
-            <p className="text-gray-600">Content management coming soon...</p>
-          </div>
-        </div>
-      )}
-
       {/* Fallback for unknown tabs */}
-      {!['dashboard','loans','user-form-loan-detail','home-loan-cards','hero-banner','logo','navigation','home-content','authentication','faq','settings','content','categories','loan-categories'].includes(activeTab) && (
+      {!['dashboard','loans','user-form-loan-detail','hero-banner','logo-settings','navigation','authentication','faq','categories','loan-categories'].includes(activeTab) && (
         <div className="bg-white rounded-lg shadow p-6">
           <p className="text-gray-600">No content for this section.</p>
         </div>

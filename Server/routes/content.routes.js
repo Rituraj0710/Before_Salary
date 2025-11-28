@@ -11,39 +11,57 @@ const router = express.Router();
 router.get('/navigation', async (req, res) => {
   try {
     const AdminSettings = (await import('../models/AdminSettings.model.js')).default;
-    const settings = await AdminSettings.findOne();
+    // Always use the latest settings document in case multiple exist
+    const settings = await AdminSettings.findOne().sort({ createdAt: -1 });
     
-    if (!settings || !settings.navigation || settings.navigation.length === 0) {
-      // Return default navigation
+    // Default navigation items
+    const defaultNavigation = [
+      { label: 'Home', path: '/', isPublic: true, isVisible: true },
+      { label: 'About Us', path: '/about', isPublic: true, isVisible: true },
+      { label: 'Loans', path: '/loans', isPublic: true, isVisible: true },
+      { label: 'FAQs', path: '/faq', isPublic: true, isVisible: true },
+      { label: 'Repay Loan', path: '/repay', isPublic: true, isVisible: true },
+      { label: 'Contact Us', path: '/contact', isPublic: true, isVisible: true }
+    ];
+
+    if (!settings) {
+      // Return default values if no settings exist
       return res.json({
         success: true,
         data: {
           siteName: 'BeforeSalary',
           siteTagline: 'For Brighter Tomorrow',
           siteLogo: '',
-          navigation: [
-            { label: 'Home', path: '/', isPublic: true, isVisible: true },
-            { label: 'About Us', path: '/about', isPublic: true, isVisible: true },
-            { label: 'Loans', path: '/loans', isPublic: true, isVisible: true },
-            { label: 'FAQs', path: '/faq', isPublic: true, isVisible: true },
-            { label: 'Repay Loan', path: '/repay', isPublic: true, isVisible: true },
-            { label: 'Contact Us', path: '/contact', isPublic: true, isVisible: true }
-          ]
+          navigation: defaultNavigation
         }
       });
     }
 
-    const visibleNav = settings.navigation
-      .filter(item => item.isVisible !== false)
-      .sort((a, b) => (a.order || 0) - (b.order || 0));
+    // Get navigation items - use settings navigation if available, otherwise use defaults
+    let navigation = defaultNavigation;
+    if (settings.navigation && Array.isArray(settings.navigation) && settings.navigation.length > 0) {
+      // Filter visible items and sort by order
+      // Only show items that are explicitly set to visible (isVisible !== false)
+      const visibleItems = settings.navigation
+        .filter(item => {
+          // Show item if isVisible is true or undefined (default to visible)
+          return item.isVisible !== false;
+        })
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
+      
+      // Use visible items if we have any, otherwise fall back to defaults
+      // This ensures that if admin hides all items, we still show defaults
+      navigation = visibleItems.length > 0 ? visibleItems : defaultNavigation;
+    }
 
+    // Always return logo and branding from settings, even if navigation is empty
     res.json({
       success: true,
       data: {
         siteName: settings.siteName || 'BeforeSalary',
         siteTagline: settings.siteTagline || 'For Brighter Tomorrow',
         siteLogo: settings.siteLogo || '',
-        navigation: visibleNav
+        navigation: navigation
       }
     });
   } catch (error) {

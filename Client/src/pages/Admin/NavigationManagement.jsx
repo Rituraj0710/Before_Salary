@@ -24,17 +24,22 @@ const NavigationManagement = () => {
   const fetchNavigation = async () => {
     try {
       const response = await api.get('/admin/navigation');
-      setNavItems(response.data.data || []);
+      if (response.data.success) {
+        const items = response.data.data || [];
+        // Ensure all items have _id for editing/deleting
+        const itemsWithIds = items.map((item, index) => ({
+          ...item,
+          _id: item._id || `temp-${index}`,
+          order: item.order || index + 1
+        }));
+        setNavItems(itemsWithIds);
+      } else {
+        setNavItems([]);
+      }
     } catch (error) {
-      // If endpoint doesn't exist, use default navigation
-      setNavItems([
-        { _id: '1', label: 'Home', path: '/', order: 1, isVisible: true, isPublic: true },
-        { _id: '2', label: 'About Us', path: '/about', order: 2, isVisible: true, isPublic: true },
-        { _id: '3', label: 'Loans', path: '/loans', order: 3, isVisible: true, isPublic: true },
-        { _id: '4', label: 'FAQs', path: '/faq', order: 4, isVisible: true, isPublic: true },
-        { _id: '5', label: 'Repay Loan', path: '/repay', order: 5, isVisible: true, isPublic: true },
-        { _id: '6', label: 'Contact Us', path: '/contact', order: 6, isVisible: true, isPublic: true }
-      ]);
+      console.error('Error fetching navigation:', error);
+      toast.error('Failed to load navigation items');
+      setNavItems([]);
     } finally {
       setLoading(false);
     }
@@ -133,6 +138,10 @@ const NavigationManagement = () => {
 
       {loading ? (
         <div className="text-center py-12">Loading...</div>
+      ) : sortedItems.length === 0 ? (
+        <div className="bg-white rounded-lg shadow p-12 text-center">
+          <p className="text-gray-500 mb-4">No navigation items found. Click "Add Menu Item" to create one.</p>
+        </div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <table className="min-w-full divide-y divide-gray-200">
