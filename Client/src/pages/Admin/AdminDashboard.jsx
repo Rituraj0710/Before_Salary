@@ -20,6 +20,9 @@ import HomeLoanCards from './HomeLoanCards';
 import HomeContentSettings from './HomeContentSettings';
 import FAQManagement from './FAQManagement';
 import Categories from './Categories';
+import UserFormLoanDetail from './UserFormLoanDetail';
+import Users from './Users';
+import EligibilityManagement from './EligibilityManagement';
 
 const AdminDashboard = () => {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -323,6 +326,11 @@ const AdminDashboard = () => {
         <Categories />
       )}
 
+      {/* Eligibility Management Tab */}
+      {activeTab === 'eligibility' && (
+        <EligibilityManagement />
+      )}
+
       {/* Settings Tab */}
       {activeTab === 'settings' && (
         <div>
@@ -344,7 +352,7 @@ const AdminDashboard = () => {
       )}
 
       {/* Fallback for unknown tabs */}
-      {!['dashboard','loans','home-loan-cards','hero-banner','logo','navigation','home-content','authentication','faq','settings','content','categories','loan-categories'].includes(activeTab) && (
+      {!['dashboard','users','loans','user-form-loan-detail','home-loan-cards','hero-banner','logo','navigation','home-content','authentication','faq','settings','content','categories','loan-categories','eligibility'].includes(activeTab) && (
         <div className="bg-white rounded-lg shadow p-6">
           <p className="text-gray-600">No content for this section.</p>
         </div>
@@ -354,4 +362,3 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
-

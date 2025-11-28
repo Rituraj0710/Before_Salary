@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
 import { 
@@ -41,26 +41,11 @@ const UserFormLoanDetail = () => {
     placeholder: '',
     label: '',
     options: [],
-    order: 0
+    order: 0,
+    section: 'employment'
   });
 
-  useEffect(() => {
-    if (activeTab === 'applications') {
-      fetchApplications();
-    } else {
-      fetchCategories();
-    }
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (selectedCategory) {
-      fetchFormFields();
-    } else {
-      setFormFields([]);
-    }
-  }, [selectedCategory]);
-
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       setLoadingCategories(true);
       const response = await api.get('/categories');
@@ -71,9 +56,9 @@ const UserFormLoanDetail = () => {
     } finally {
       setLoadingCategories(false);
     }
-  };
+  }, []);
 
-  const fetchFormFields = async () => {
+  const fetchFormFields = useCallback(async () => {
     if (!selectedCategory) return;
     try {
       setLoadingFields(true);
@@ -85,9 +70,9 @@ const UserFormLoanDetail = () => {
     } finally {
       setLoadingFields(false);
     }
-  };
+  }, [selectedCategory]);
 
-  const fetchApplications = async () => {
+  const fetchApplications = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.get('/admin/applications');
@@ -98,7 +83,23 @@ const UserFormLoanDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'applications') {
+      fetchApplications();
+    } else {
+      fetchCategories();
+    }
+  }, [activeTab, fetchApplications, fetchCategories]);
+
+  useEffect(() => {
+    if (selectedCategory) {
+      fetchFormFields();
+    } else {
+      setFormFields([]);
+    }
+  }, [selectedCategory, fetchFormFields]);
 
   const handleViewDetails = (application) => {
     setSelectedApplication(application);
@@ -135,7 +136,7 @@ const UserFormLoanDetail = () => {
     return url.startsWith('http') ? url : `${apiBaseUrl}${url}`;
   };
 
-  const handleAddField = () => {
+  const handleAddField = (section = 'employment') => {
     setEditingField(null);
     setFieldForm({
       name: '',
@@ -144,7 +145,8 @@ const UserFormLoanDetail = () => {
       placeholder: '',
       label: '',
       options: [],
-      order: formFields.length
+      order: formFields.filter(f => f.section === section).length,
+      section: section
     });
     setShowFieldModal(true);
   };
@@ -158,7 +160,8 @@ const UserFormLoanDetail = () => {
       placeholder: field.placeholder || '',
       label: field.label || field.name || '',
       options: field.options || [],
-      order: field.order || 0
+      order: field.order || 0,
+      section: field.section || 'employment'
     });
     setShowFieldModal(true);
   };
@@ -187,7 +190,8 @@ const UserFormLoanDetail = () => {
       options: fieldForm.options || [],
       required: fieldForm.required || false,
       width: 'full',
-      order: fieldForm.order || formFields.length
+      order: fieldForm.order || formFields.filter(f => f.section === fieldForm.section).length,
+      section: fieldForm.section || 'employment'
     };
 
     try {
@@ -215,10 +219,147 @@ const UserFormLoanDetail = () => {
       placeholder: '',
       label: '',
       options: [],
-      order: 0
+      order: 0,
+      section: 'employment'
     });
     setEditingField(null);
   };
+
+  const renderPreviewField = (field, index) => (
+    <div key={field._id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+      <div className="flex items-start justify-between mb-2">
+        <div className="flex-1">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {field.label || field.name}
+            {field.required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          {field.placeholder && (
+            <p className="text-xs text-gray-500 mb-2">{field.placeholder}</p>
+          )}
+        </div>
+        <span className="ml-2 px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800">
+          #{index + 1}
+        </span>
+      </div>
+      
+      {/* Render field based on type */}
+      {field.type === 'Text' && (
+        <input
+          type="text"
+          disabled
+          placeholder={`Enter ${field.label || field.name.toLowerCase()}`}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed"
+        />
+      )}
+      
+      {field.type === 'Number' && (
+        <input
+          type="number"
+          disabled
+          placeholder={`Enter ${field.label || field.name.toLowerCase()}`}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed"
+        />
+      )}
+      
+      {field.type === 'Email' && (
+        <input
+          type="email"
+          disabled
+          placeholder={`Enter email address`}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed"
+        />
+      )}
+      
+      {field.type === 'Phone' && (
+        <input
+          type="tel"
+          disabled
+          placeholder={`Enter phone number`}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed"
+        />
+      )}
+      
+      {field.type === 'Date' && (
+        <input
+          type="date"
+          disabled
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed"
+        />
+      )}
+      
+      {field.type === 'Textarea' && (
+        <textarea
+          disabled
+          rows="3"
+          placeholder={`Enter ${field.label || field.name.toLowerCase()}`}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed resize-none"
+        />
+      )}
+      
+      {field.type === 'Select' && field.options && field.options.length > 0 && (
+        <select
+          disabled
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed"
+        >
+          <option value="">-- Select an option --</option>
+          {field.options.map((option, optIndex) => (
+            <option key={optIndex} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      )}
+      
+      {field.type === 'Radio' && field.options && field.options.length > 0 && (
+        <div className="space-y-2">
+          {field.options.map((option, optIndex) => (
+            <label key={optIndex} className="flex items-center text-gray-500 cursor-not-allowed">
+              <input
+                type="radio"
+                disabled
+                name={`preview-${field._id}`}
+                className="mr-2"
+              />
+              {option}
+            </label>
+          ))}
+        </div>
+      )}
+      
+      {field.type === 'Checkbox' && (
+        <label className="flex items-center text-gray-500 cursor-not-allowed">
+          <input
+            type="checkbox"
+            disabled
+            className="mr-2"
+          />
+          {field.placeholder || 'Check this box'}
+        </label>
+      )}
+      
+      {field.type === 'File' && (
+        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+          <p className="text-sm text-gray-500">File upload area</p>
+          <p className="text-xs text-gray-400 mt-1">Click to browse files</p>
+        </div>
+      )}
+      
+      <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+        <span className="px-2 py-1 bg-gray-200 rounded">
+          {field.type}
+        </span>
+        {field.required ? (
+          <span className="px-2 py-1 bg-red-100 text-red-600 rounded">
+            Required
+          </span>
+        ) : (
+          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded">
+            Optional
+          </span>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div>
@@ -291,17 +432,14 @@ const UserFormLoanDetail = () => {
 
           {selectedCategory && (
             <div className="bg-white rounded-lg shadow">
-              <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-900">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
                   Form Fields for {categories.find(c => c._id === selectedCategory)?.name}
                 </h3>
-                <button
-                  onClick={handleAddField}
-                  className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 flex items-center"
-                >
-                  <PlusIcon className="h-5 w-5 mr-2" />
-                  Add Field
-                </button>
+                <p className="text-sm text-gray-600">
+                  Create dynamic form fields organized in 3 sections: <strong>Employment / Source of Income</strong>, <strong>Loan Details</strong>, and <strong>Documents</strong>. 
+                  These fields will appear in the loan application form for all loans in this category.
+                </p>
               </div>
 
               <div className="p-6">
@@ -309,59 +447,223 @@ const UserFormLoanDetail = () => {
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-600 mx-auto"></div>
                   </div>
-                ) : formFields.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <DocumentTextIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <p>No form fields added yet. Click "Add Field" to create one.</p>
-                  </div>
                 ) : (
-                  <div className="space-y-3">
-                    {formFields.map((field) => (
-                      <div
-                        key={field._id}
-                        className="border border-gray-200 rounded-lg p-4 flex items-center justify-between hover:bg-gray-50"
-                      >
-                        <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{field.label || field.name}</p>
-                            <p className="text-xs text-gray-500">Name: {field.name}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Type: {field.type}</p>
-                          </div>
-                          <div>
-                            {field.required ? (
-                              <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
-                                Required
-                              </span>
-                            ) : (
-                              <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
-                                Optional
-                              </span>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Order: {field.order}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 ml-4">
-                          <button
-                            onClick={() => handleEditField(field)}
-                            className="text-blue-600 hover:text-blue-800 p-1"
-                            title="Edit field"
-                          >
-                            <PencilIcon className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteField(field._id)}
-                            className="text-red-600 hover:text-red-800 p-1"
-                            title="Delete field"
-                          >
-                            <TrashIcon className="h-5 w-5" />
-                          </button>
-                        </div>
+                  <div className="space-y-6">
+                    {/* Employment / Source of Income Section */}
+                    <div className="border border-gray-200 rounded-lg">
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                        <h4 className="text-md font-semibold text-gray-900 flex items-center">
+                          <BuildingOfficeIcon className="h-5 w-5 mr-2 text-orange-500" />
+                          Employment / Source of Income
+                        </h4>
+                        <button
+                          onClick={() => handleAddField('employment')}
+                          className="bg-orange-500 text-white px-3 py-1.5 rounded-lg hover:bg-orange-600 flex items-center text-sm"
+                        >
+                          <PlusIcon className="h-4 w-4 mr-1" />
+                          Add Field
+                        </button>
                       </div>
-                    ))}
+                      <div className="p-4 space-y-3">
+                        {formFields.filter(f => f.section === 'employment').length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-4">No fields in this section</p>
+                        ) : (
+                          formFields
+                            .filter(f => f.section === 'employment')
+                            .sort((a, b) => (a.order || 0) - (b.order || 0))
+                            .map((field) => (
+                              <div
+                                key={field._id}
+                                className="border border-gray-200 rounded-lg p-4 flex items-center justify-between hover:bg-gray-50"
+                              >
+                                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-900">{field.label || field.name}</p>
+                                    <p className="text-xs text-gray-500">Name: {field.name}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-600">Type: {field.type}</p>
+                                  </div>
+                                  <div>
+                                    {field.required ? (
+                                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                                        Required
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+                                        Optional
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-500">Order: {field.order}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 ml-4">
+                                  <button
+                                    onClick={() => handleEditField(field)}
+                                    className="text-blue-600 hover:text-blue-800 p-1"
+                                    title="Edit field"
+                                  >
+                                    <PencilIcon className="h-5 w-5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteField(field._id)}
+                                    className="text-red-600 hover:text-red-800 p-1"
+                                    title="Delete field"
+                                  >
+                                    <TrashIcon className="h-5 w-5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Loan Details Section */}
+                    <div className="border border-gray-200 rounded-lg">
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                        <h4 className="text-md font-semibold text-gray-900 flex items-center">
+                          <CurrencyDollarIcon className="h-5 w-5 mr-2 text-orange-500" />
+                          Loan Details
+                        </h4>
+                        <button
+                          onClick={() => handleAddField('loanDetails')}
+                          className="bg-orange-500 text-white px-3 py-1.5 rounded-lg hover:bg-orange-600 flex items-center text-sm"
+                        >
+                          <PlusIcon className="h-4 w-4 mr-1" />
+                          Add Field
+                        </button>
+                      </div>
+                      <div className="p-4 space-y-3">
+                        {formFields.filter(f => f.section === 'loanDetails').length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-4">No fields in this section</p>
+                        ) : (
+                          formFields
+                            .filter(f => f.section === 'loanDetails')
+                            .sort((a, b) => (a.order || 0) - (b.order || 0))
+                            .map((field) => (
+                              <div
+                                key={field._id}
+                                className="border border-gray-200 rounded-lg p-4 flex items-center justify-between hover:bg-gray-50"
+                              >
+                                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-900">{field.label || field.name}</p>
+                                    <p className="text-xs text-gray-500">Name: {field.name}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-600">Type: {field.type}</p>
+                                  </div>
+                                  <div>
+                                    {field.required ? (
+                                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                                        Required
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+                                        Optional
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-500">Order: {field.order}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 ml-4">
+                                  <button
+                                    onClick={() => handleEditField(field)}
+                                    className="text-blue-600 hover:text-blue-800 p-1"
+                                    title="Edit field"
+                                  >
+                                    <PencilIcon className="h-5 w-5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteField(field._id)}
+                                    className="text-red-600 hover:text-red-800 p-1"
+                                    title="Delete field"
+                                  >
+                                    <TrashIcon className="h-5 w-5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Documents Section */}
+                    <div className="border border-gray-200 rounded-lg">
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                        <h4 className="text-md font-semibold text-gray-900 flex items-center">
+                          <DocumentArrowUpIcon className="h-5 w-5 mr-2 text-orange-500" />
+                          Documents
+                        </h4>
+                        <button
+                          onClick={() => handleAddField('documents')}
+                          className="bg-orange-500 text-white px-3 py-1.5 rounded-lg hover:bg-orange-600 flex items-center text-sm"
+                        >
+                          <PlusIcon className="h-4 w-4 mr-1" />
+                          Add Field
+                        </button>
+                      </div>
+                      <div className="p-4 space-y-3">
+                        {formFields.filter(f => f.section === 'documents').length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-4">No fields in this section</p>
+                        ) : (
+                          formFields
+                            .filter(f => f.section === 'documents')
+                            .sort((a, b) => (a.order || 0) - (b.order || 0))
+                            .map((field) => (
+                              <div
+                                key={field._id}
+                                className="border border-gray-200 rounded-lg p-4 flex items-center justify-between hover:bg-gray-50"
+                              >
+                                <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-900">{field.label || field.name}</p>
+                                    <p className="text-xs text-gray-500">Name: {field.name}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-600">Type: {field.type}</p>
+                                  </div>
+                                  <div>
+                                    {field.required ? (
+                                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                                        Required
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+                                        Optional
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <p className="text-sm text-gray-500">Order: {field.order}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 ml-4">
+                                  <button
+                                    onClick={() => handleEditField(field)}
+                                    className="text-blue-600 hover:text-blue-800 p-1"
+                                    title="Edit field"
+                                  >
+                                    <PencilIcon className="h-5 w-5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteField(field._id)}
+                                    className="text-red-600 hover:text-red-800 p-1"
+                                    title="Delete field"
+                                  >
+                                    <TrashIcon className="h-5 w-5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -374,146 +676,64 @@ const UserFormLoanDetail = () => {
               <div className="px-6 py-4 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900">Form Preview</h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  This is how the form will appear to users. Fields are displayed in the order they were added.
+                  This is how the form will appear to users. Fields are organized by sections.
                 </p>
               </div>
               <div className="p-6">
-                <div className="max-w-2xl mx-auto space-y-4">
-                  {[...formFields].sort((a, b) => (a.order || 0) - (b.order || 0)).map((field, index) => (
-                    <div key={field._id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            {field.label || field.name}
-                            {field.required && <span className="text-red-500 ml-1">*</span>}
-                          </label>
-                          {field.placeholder && (
-                            <p className="text-xs text-gray-500 mb-2">{field.placeholder}</p>
-                          )}
-                        </div>
-                        <span className="ml-2 px-2 py-1 text-xs font-medium rounded-full bg-orange-100 text-orange-800">
-                          #{index + 1}
-                        </span>
+                <div className="max-w-2xl mx-auto space-y-6">
+                  {/* Employment Section Preview */}
+                  {formFields.filter(f => f.section === 'employment').length > 0 && (
+                    <div className="border border-gray-200 rounded-lg">
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                        <h4 className="text-md font-semibold text-gray-900 flex items-center">
+                          <BuildingOfficeIcon className="h-5 w-5 mr-2 text-orange-500" />
+                          Employment / Source of Income
+                        </h4>
                       </div>
-                      
-                      {/* Render field based on type */}
-                      {field.type === 'Text' && (
-                        <input
-                          type="text"
-                          disabled
-                          placeholder={`Enter ${field.label || field.name.toLowerCase()}`}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed"
-                        />
-                      )}
-                      
-                      {field.type === 'Number' && (
-                        <input
-                          type="number"
-                          disabled
-                          placeholder={`Enter ${field.label || field.name.toLowerCase()}`}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed"
-                        />
-                      )}
-                      
-                      {field.type === 'Email' && (
-                        <input
-                          type="email"
-                          disabled
-                          placeholder={`Enter email address`}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed"
-                        />
-                      )}
-                      
-                      {field.type === 'Phone' && (
-                        <input
-                          type="tel"
-                          disabled
-                          placeholder={`Enter phone number`}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed"
-                        />
-                      )}
-                      
-                      {field.type === 'Date' && (
-                        <input
-                          type="date"
-                          disabled
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed"
-                        />
-                      )}
-                      
-                      {field.type === 'Textarea' && (
-                        <textarea
-                          disabled
-                          rows="3"
-                          placeholder={`Enter ${field.label || field.name.toLowerCase()}`}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed resize-none"
-                        />
-                      )}
-                      
-                      {field.type === 'Select' && field.options && field.options.length > 0 && (
-                        <select
-                          disabled
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-500 cursor-not-allowed"
-                        >
-                          <option value="">-- Select an option --</option>
-                          {field.options.map((option, optIndex) => (
-                            <option key={optIndex} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                      
-                      {field.type === 'Radio' && field.options && field.options.length > 0 && (
-                        <div className="space-y-2">
-                          {field.options.map((option, optIndex) => (
-                            <label key={optIndex} className="flex items-center text-gray-500 cursor-not-allowed">
-                              <input
-                                type="radio"
-                                disabled
-                                name={`preview-${field._id}`}
-                                className="mr-2"
-                              />
-                              {option}
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {field.type === 'Checkbox' && (
-                        <label className="flex items-center text-gray-500 cursor-not-allowed">
-                          <input
-                            type="checkbox"
-                            disabled
-                            className="mr-2"
-                          />
-                          {field.placeholder || 'Check this box'}
-                        </label>
-                      )}
-                      
-                      {field.type === 'File' && (
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                          <p className="text-sm text-gray-500">File upload area</p>
-                          <p className="text-xs text-gray-400 mt-1">Click to browse files</p>
-                        </div>
-                      )}
-                      
-                      <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
-                        <span className="px-2 py-1 bg-gray-200 rounded">
-                          {field.type}
-                        </span>
-                        {field.required ? (
-                          <span className="px-2 py-1 bg-red-100 text-red-600 rounded">
-                            Required
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded">
-                            Optional
-                          </span>
-                        )}
+                      <div className="p-4 space-y-4">
+                        {[...formFields]
+                          .filter(f => f.section === 'employment')
+                          .sort((a, b) => (a.order || 0) - (b.order || 0))
+                          .map((field, index) => renderPreviewField(field, index))}
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {/* Loan Details Section Preview */}
+                  {formFields.filter(f => f.section === 'loanDetails').length > 0 && (
+                    <div className="border border-gray-200 rounded-lg">
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                        <h4 className="text-md font-semibold text-gray-900 flex items-center">
+                          <CurrencyDollarIcon className="h-5 w-5 mr-2 text-orange-500" />
+                          Loan Details
+                        </h4>
+                      </div>
+                      <div className="p-4 space-y-4">
+                        {[...formFields]
+                          .filter(f => f.section === 'loanDetails')
+                          .sort((a, b) => (a.order || 0) - (b.order || 0))
+                          .map((field, index) => renderPreviewField(field, index))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Documents Section Preview */}
+                  {formFields.filter(f => f.section === 'documents').length > 0 && (
+                    <div className="border border-gray-200 rounded-lg">
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                        <h4 className="text-md font-semibold text-gray-900 flex items-center">
+                          <DocumentArrowUpIcon className="h-5 w-5 mr-2 text-orange-500" />
+                          Documents
+                        </h4>
+                      </div>
+                      <div className="p-4 space-y-4">
+                        {[...formFields]
+                          .filter(f => f.section === 'documents')
+                          .sort((a, b) => (a.order || 0) - (b.order || 0))
+                          .map((field, index) => renderPreviewField(field, index))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -666,6 +886,20 @@ const UserFormLoanDetail = () => {
                   placeholder="field-name (auto-generated from label)"
                 />
                 <p className="text-xs text-gray-500 mt-1">Used internally (auto-generated from label if not provided)</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Section *</label>
+                <select
+                  required
+                  value={fieldForm.section}
+                  onChange={(e) => setFieldForm({ ...fieldForm, section: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                >
+                  <option value="employment">Employment / Source of Income</option>
+                  <option value="loanDetails">Loan Details</option>
+                  <option value="documents">Documents</option>
+                </select>
               </div>
 
               <div>

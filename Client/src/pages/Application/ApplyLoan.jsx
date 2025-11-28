@@ -29,6 +29,8 @@ const ApplyLoan = () => {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [categoryError, setCategoryError] = useState(null);
+  const [dynamicFields, setDynamicFields] = useState([]);
+  const [loadingFields, setLoadingFields] = useState(false);
 
   const [formData, setFormData] = useState({
     loanId: loanId || '',
@@ -79,7 +81,8 @@ const ApplyLoan = () => {
       incomeProof: [],
       bankStatement: [],
       otherDocuments: []
-    }
+    },
+    dynamicFields: {} // Store dynamic field values
   });
 
   useEffect(() => {
@@ -150,9 +153,29 @@ const ApplyLoan = () => {
     try {
       const response = await api.get(`/loans`);
       const loan = response.data.data.find(l => l._id === id);
-      if (loan) setSelectedLoan(loan);
+      if (loan) {
+        setSelectedLoan(loan);
+        // Fetch dynamic fields for the loan's category
+        if (loan.category?._id || loan.category) {
+          fetchDynamicFields(loan.category._id || loan.category);
+        }
+      }
     } catch (error) {
       console.error('Error fetching loan:', error);
+    }
+  };
+
+  const fetchDynamicFields = async (categoryId) => {
+    if (!categoryId) return;
+    try {
+      setLoadingFields(true);
+      const response = await api.get(`/form-fields/category/${categoryId}`);
+      setDynamicFields(response.data.data || []);
+    } catch (error) {
+      console.error('Error fetching dynamic fields:', error);
+      setDynamicFields([]);
+    } finally {
+      setLoadingFields(false);
     }
   };
 
@@ -205,6 +228,188 @@ const ApplyLoan = () => {
     });
   };
 
+  const handleDynamicFieldChange = (fieldName, value, fieldType) => {
+    setFormData({
+      ...formData,
+      dynamicFields: {
+        ...formData.dynamicFields,
+        [fieldName]: fieldType === 'File' ? value : value
+      }
+    });
+  };
+
+  const handleDynamicFileChange = (fieldName, files) => {
+    setFormData({
+      ...formData,
+      dynamicFields: {
+        ...formData.dynamicFields,
+        [fieldName]: Array.from(files)
+      }
+    });
+  };
+
+  const renderDynamicField = (field) => {
+    const fieldValue = formData.dynamicFields[field.name] || '';
+    const fieldId = `dynamic-${field._id}`;
+
+    switch (field.type) {
+      case 'Text':
+        return (
+          <input
+            type="text"
+            id={fieldId}
+            name={field.name}
+            required={field.required}
+            value={fieldValue}
+            onChange={(e) => handleDynamicFieldChange(field.name, e.target.value, 'Text')}
+            placeholder={field.placeholder || `Enter ${field.label || field.name}`}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        );
+      
+      case 'Number':
+        return (
+          <input
+            type="number"
+            id={fieldId}
+            name={field.name}
+            required={field.required}
+            value={fieldValue}
+            onChange={(e) => handleDynamicFieldChange(field.name, e.target.value, 'Number')}
+            placeholder={field.placeholder || `Enter ${field.label || field.name}`}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        );
+      
+      case 'Email':
+        return (
+          <input
+            type="email"
+            id={fieldId}
+            name={field.name}
+            required={field.required}
+            value={fieldValue}
+            onChange={(e) => handleDynamicFieldChange(field.name, e.target.value, 'Email')}
+            placeholder={field.placeholder || 'Enter email address'}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        );
+      
+      case 'Phone':
+        return (
+          <input
+            type="tel"
+            id={fieldId}
+            name={field.name}
+            required={field.required}
+            value={fieldValue}
+            onChange={(e) => handleDynamicFieldChange(field.name, e.target.value, 'Phone')}
+            placeholder={field.placeholder || 'Enter phone number'}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        );
+      
+      case 'Date':
+        return (
+          <input
+            type="date"
+            id={fieldId}
+            name={field.name}
+            required={field.required}
+            value={fieldValue}
+            onChange={(e) => handleDynamicFieldChange(field.name, e.target.value, 'Date')}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        );
+      
+      case 'Textarea':
+        return (
+          <textarea
+            id={fieldId}
+            name={field.name}
+            required={field.required}
+            value={fieldValue}
+            onChange={(e) => handleDynamicFieldChange(field.name, e.target.value, 'Textarea')}
+            placeholder={field.placeholder || `Enter ${field.label || field.name}`}
+            rows="3"
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        );
+      
+      case 'Select':
+        return (
+          <select
+            id={fieldId}
+            name={field.name}
+            required={field.required}
+            value={fieldValue}
+            onChange={(e) => handleDynamicFieldChange(field.name, e.target.value, 'Select')}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">-- Select an option --</option>
+            {field.options?.map((option, index) => (
+              <option key={index} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        );
+      
+      case 'Radio':
+        return (
+          <div className="space-y-2">
+            {field.options?.map((option, index) => (
+              <label key={index} className="flex items-center">
+                <input
+                  type="radio"
+                  name={field.name}
+                  value={option}
+                  required={field.required}
+                  checked={fieldValue === option}
+                  onChange={(e) => handleDynamicFieldChange(field.name, e.target.value, 'Radio')}
+                  className="mr-2"
+                />
+                {option}
+              </label>
+            ))}
+          </div>
+        );
+      
+      case 'Checkbox':
+        return (
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              id={fieldId}
+              name={field.name}
+              required={field.required}
+              checked={!!fieldValue}
+              onChange={(e) => handleDynamicFieldChange(field.name, e.target.checked, 'Checkbox')}
+              className="mr-2"
+            />
+            {field.placeholder || field.label || 'Check this box'}
+          </label>
+        );
+      
+      case 'File':
+        return (
+          <input
+            type="file"
+            id={fieldId}
+            name={field.name}
+            required={field.required}
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png"
+            onChange={(e) => handleDynamicFileChange(field.name, e.target.files)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        );
+      
+      default:
+        return null;
+    }
+  };
+
   const handleSendOTP = async () => {
     const result = await sendOTP(formData.personalInfo.email, formData.personalInfo.phone, 'application');
     if (result.success) {
@@ -239,10 +444,35 @@ const ApplyLoan = () => {
       formDataToSend.append('employmentInfo', JSON.stringify(formData.employmentInfo));
       formDataToSend.append('loanDetails', JSON.stringify(formData.loanDetails));
 
-      // Append files
+      // Append static document files
       Object.keys(formData.documents).forEach(docType => {
         formData.documents[docType].forEach((file, index) => {
           formDataToSend.append(docType, file);
+        });
+      });
+
+      // Prepare dynamic fields data (excluding files)
+      const dynamicFieldsData = {};
+      const dynamicFileFields = {};
+
+      dynamicFields.forEach(field => {
+        const value = formData.dynamicFields[field.name];
+        if (field.type === 'File' && value && Array.isArray(value) && value.length > 0) {
+          // Store file field name for later appending
+          dynamicFileFields[field.name] = value;
+        } else if (value !== undefined && value !== null && value !== '') {
+          // Store non-file field values
+          dynamicFieldsData[field.name] = value;
+        }
+      });
+
+      // Append dynamic fields data
+      formDataToSend.append('dynamicFields', JSON.stringify(dynamicFieldsData));
+
+      // Append dynamic file fields
+      Object.keys(dynamicFileFields).forEach(fieldName => {
+        dynamicFileFields[fieldName].forEach((file) => {
+          formDataToSend.append(`dynamicFiles_${fieldName}`, file);
         });
       });
 
@@ -538,107 +768,38 @@ const ApplyLoan = () => {
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
                   <BriefcaseIcon className="h-6 w-6 mr-2" />
-                  Employment Information
+                  Employment / Source of Income
                 </h2>
                 
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Employment Type *
-                    </label>
-                    <select
-                      required
-                      value={formData.employmentInfo.employmentType}
-                      onChange={(e) => handleChange(e, 'employmentInfo', 'employmentType')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Select</option>
-                      <option value="Salaried">Salaried</option>
-                      <option value="Self-Employed">Self-Employed</option>
-                      <option value="Business">Business</option>
-                    </select>
+                {loadingFields ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-sm text-gray-500 mt-2">Loading form fields...</p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Monthly Income *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      value={formData.employmentInfo.monthlyIncome}
-                      onChange={(e) => handleChange(e, 'employmentInfo', 'monthlyIncome')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
+                ) : (
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {dynamicFields
+                      .filter(f => f.section === 'employment')
+                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                      .map((field) => (
+                        <div key={field._id} className={field.width === 'half' ? 'md:col-span-1' : 'md:col-span-2'}>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            {field.label || field.name}
+                            {field.required && <span className="text-red-500 ml-1">*</span>}
+                          </label>
+                          {field.placeholder && (
+                            <p className="text-xs text-gray-500 mb-2">{field.placeholder}</p>
+                          )}
+                          {renderDynamicField(field)}
+                        </div>
+                      ))}
+                    {dynamicFields.filter(f => f.section === 'employment').length === 0 && (
+                      <div className="md:col-span-2 text-center py-8 text-gray-500">
+                        <p>No employment fields configured for this loan category.</p>
+                      </div>
+                    )}
                   </div>
-                  {formData.employmentInfo.employmentType === 'Salaried' && (
-                    <>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Company Name *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={formData.employmentInfo.companyName}
-                          onChange={(e) => handleChange(e, 'employmentInfo', 'companyName')}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Designation *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={formData.employmentInfo.designation}
-                          onChange={(e) => handleChange(e, 'employmentInfo', 'designation')}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Work Experience (Years) *
-                        </label>
-                        <input
-                          type="number"
-                          required
-                          value={formData.employmentInfo.workExperience}
-                          onChange={(e) => handleChange(e, 'employmentInfo', 'workExperience')}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                    </>
-                  )}
-                  {(formData.employmentInfo.employmentType === 'Self-Employed' || formData.employmentInfo.employmentType === 'Business') && (
-                    <>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Business Type *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={formData.employmentInfo.businessType}
-                          onChange={(e) => handleChange(e, 'employmentInfo', 'businessType')}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Business Age (Years) *
-                        </label>
-                        <input
-                          type="number"
-                          required
-                          value={formData.employmentInfo.businessAge}
-                          onChange={(e) => handleChange(e, 'employmentInfo', 'businessAge')}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
+                )}
               </div>
             )}
 
@@ -658,6 +819,12 @@ const ApplyLoan = () => {
                       setFormData({ ...formData, loanId: e.target.value });
                       const loan = filteredLoans.find(l => l._id === e.target.value);
                       setSelectedLoan(loan || null);
+                      // Fetch dynamic fields when loan is selected
+                      if (loan?.category?._id || loan?.category) {
+                        fetchDynamicFields(loan.category._id || loan.category);
+                      } else {
+                        setDynamicFields([]);
+                      }
                     }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
@@ -682,6 +849,7 @@ const ApplyLoan = () => {
                       // Clear selected loan when category changes
                       setFormData(f => ({ ...f, loanId: '' }));
                       setSelectedLoan(null);
+                      setDynamicFields([]);
                     }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
@@ -710,49 +878,35 @@ const ApplyLoan = () => {
                   </div>
                 )}
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Loan Amount * (₹)
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      value={formData.loanDetails.loanAmount}
-                      onChange={(e) => handleChange(e, 'loanDetails', 'loanAmount')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      min={selectedLoan?.minLoanAmount || 0}
-                      max={selectedLoan?.maxLoanAmount || 10000000}
-                    />
+                {loadingFields ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-sm text-gray-500 mt-2">Loading form fields...</p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Loan Tenure (Months) *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      value={formData.loanDetails.loanTenure}
-                      onChange={(e) => handleChange(e, 'loanDetails', 'loanTenure')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      min={selectedLoan?.minTenure || 1}
-                      max={selectedLoan?.maxTenure || 360}
-                    />
+                ) : (
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {dynamicFields
+                      .filter(f => f.section === 'loanDetails')
+                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                      .map((field) => (
+                        <div key={field._id} className={field.width === 'half' ? 'md:col-span-1' : 'md:col-span-2'}>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            {field.label || field.name}
+                            {field.required && <span className="text-red-500 ml-1">*</span>}
+                          </label>
+                          {field.placeholder && (
+                            <p className="text-xs text-gray-500 mb-2">{field.placeholder}</p>
+                          )}
+                          {renderDynamicField(field)}
+                        </div>
+                      ))}
+                    {dynamicFields.filter(f => f.section === 'loanDetails').length === 0 && (
+                      <div className="md:col-span-2 text-center py-8 text-gray-500">
+                        <p>No loan details fields configured for this loan category.</p>
+                      </div>
+                    )}
                   </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Loan Purpose *
-                    </label>
-                    <textarea
-                      required
-                      value={formData.loanDetails.purpose}
-                      onChange={(e) => handleChange(e, 'loanDetails', 'purpose')}
-                      rows="3"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Describe the purpose of your loan"
-                    />
-                  </div>
-                </div>
+                )}
               </div>
             )}
 
@@ -761,75 +915,38 @@ const ApplyLoan = () => {
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
                   <DocumentIcon className="h-6 w-6 mr-2" />
-                  Upload Documents & Verify
+                  Documents & Verify
                 </h2>
 
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      ID Proof (Aadhar, PAN, etc.) *
-                    </label>
-                    <input
-                      type="file"
-                      multiple
-                      required
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileChange(e, 'idProof')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
+                {loadingFields ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-sm text-gray-500 mt-2">Loading form fields...</p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Address Proof *
-                    </label>
-                    <input
-                      type="file"
-                      multiple
-                      required
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileChange(e, 'addressProof')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
+                ) : (
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {dynamicFields
+                      .filter(f => f.section === 'documents')
+                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                      .map((field) => (
+                        <div key={field._id} className={field.width === 'half' ? 'md:col-span-1' : 'md:col-span-2'}>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            {field.label || field.name}
+                            {field.required && <span className="text-red-500 ml-1">*</span>}
+                          </label>
+                          {field.placeholder && (
+                            <p className="text-xs text-gray-500 mb-2">{field.placeholder}</p>
+                          )}
+                          {renderDynamicField(field)}
+                        </div>
+                      ))}
+                    {dynamicFields.filter(f => f.section === 'documents').length === 0 && (
+                      <div className="md:col-span-2 text-center py-8 text-gray-500">
+                        <p>No document fields configured for this loan category.</p>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Income Proof *
-                    </label>
-                    <input
-                      type="file"
-                      multiple
-                      required
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileChange(e, 'incomeProof')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Bank Statement *
-                    </label>
-                    <input
-                      type="file"
-                      multiple
-                      required
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileChange(e, 'bankStatement')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Other Documents (Optional)
-                    </label>
-                    <input
-                      type="file"
-                      multiple
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileChange(e, 'otherDocuments')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
+                )}
 
                 {/* OTP Verification */}
                 <div className="bg-gray-50 p-6 rounded-lg">

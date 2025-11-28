@@ -47,6 +47,22 @@ const DynamicNavbar = () => {
           const visibleItems = data.navigation
             .filter(item => item.isVisible !== false)
             .sort((a, b) => (a.order || 0) - (b.order || 0));
+          
+          // Ensure Loans link exists and has correct path
+          const hasLoans = visibleItems.some(item => item.path === '/loans' || item.label?.toLowerCase() === 'loans');
+          if (!hasLoans) {
+            visibleItems.push({ label: 'Loans', path: '/loans', isPublic: true, order: 2 });
+            visibleItems.sort((a, b) => (a.order || 0) - (b.order || 0));
+          } else {
+            // Ensure Loans path is correct
+            visibleItems.forEach(item => {
+              if (item.path === '/loans' || item.label?.toLowerCase() === 'loans') {
+                item.path = '/loans';
+                item.isPublic = true;
+              }
+            });
+          }
+          
           setNavItems(visibleItems);
         } else {
           // Default navigation if none set
@@ -62,14 +78,14 @@ const DynamicNavbar = () => {
       }
     } catch (error) {
       console.error('Error fetching navigation:', error);
-      // Use default navigation on error
+      // Use default navigation on error - always include Loans
       setNavItems([
-        { label: 'Home', path: '/', isPublic: true },
-        { label: 'About Us', path: '/about', isPublic: true },
-        { label: 'Loans', path: '/loans', isPublic: true },
-        { label: 'FAQs', path: '/faq', isPublic: true },
-        { label: 'Repay Loan', path: '/repay', isPublic: true },
-        { label: 'Contact Us', path: '/contact', isPublic: true }
+        { label: 'Home', path: '/', isPublic: true, order: 0 },
+        { label: 'About Us', path: '/about', isPublic: true, order: 1 },
+        { label: 'Loans', path: '/loans', isPublic: true, order: 2 },
+        { label: 'FAQs', path: '/faq', isPublic: true, order: 3 },
+        { label: 'Repay Loan', path: '/repay', isPublic: true, order: 4 },
+        { label: 'Contact Us', path: '/contact', isPublic: true, order: 5 }
       ]);
     }
   };
@@ -104,8 +120,14 @@ const DynamicNavbar = () => {
             {publicNavItems.map((item) => (
               <Link
                 key={item.path}
-                to={item.path}
-                className="text-gray-700 hover:text-orange-500 font-medium transition"
+                to={item.path || '/'}
+                className="text-gray-700 hover:text-orange-500 font-medium transition cursor-pointer"
+                onClick={(e) => {
+                  // Ensure navigation works
+                  if (!item.path || item.path === '#') {
+                    e.preventDefault();
+                  }
+                }}
               >
                 {item.label}
               </Link>
@@ -169,8 +191,8 @@ const DynamicNavbar = () => {
             {publicNavItems.map((item) => (
               <Link
                 key={item.path}
-                to={item.path}
-                className="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded"
+                to={item.path || '/'}
+                className="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded cursor-pointer"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 {item.label}

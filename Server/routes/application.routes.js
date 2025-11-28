@@ -1,7 +1,7 @@
 import express from 'express';
 import Application from '../models/Application.model.js';
 import { protect } from '../middleware/auth.middleware.js';
-import { uploadMultiple } from '../utils/upload.js';
+import { uploadMultiple, uploadAny } from '../utils/upload.js';
 import { sendEmail } from '../utils/sendEmail.js';
 import mongoose from 'mongoose';
 import Loan from '../models/Loan.model.js';
@@ -11,9 +11,31 @@ const router = express.Router();
 // @route   POST /api/applications
 // @desc    Create new loan application
 // @access  Private
-router.post('/', protect, uploadMultiple, async (req, res) => {
+router.post('/', protect, uploadAny, async (req, res) => {
   try {
-    const files = req.files || {};
+    // Organize files by field name
+    const files = {};
+    const dynamicFiles = {};
+    
+    if (req.files && Array.isArray(req.files)) {
+      req.files.forEach(file => {
+        if (file.fieldname.startsWith('dynamicFiles_')) {
+          // Dynamic file field
+          const fieldName = file.fieldname.replace('dynamicFiles_', '');
+          if (!dynamicFiles[fieldName]) {
+            dynamicFiles[fieldName] = [];
+          }
+          dynamicFiles[fieldName].push(file);
+        } else {
+          // Static document fields
+          if (!files[file.fieldname]) {
+            files[file.fieldname] = [];
+          }
+          files[file.fieldname].push(file);
+        }
+      });
+    }
+    
     const applicationData = req.body;
 
     // Parse JSON fields if they're strings
@@ -75,6 +97,27 @@ router.post('/', protect, uploadMultiple, async (req, res) => {
 
     // Handle dynamic fields
     const dynamicFields = applicationData.dynamicFields || {};
+    
+    // Process dynamic file fields and add to documents array
+    Object.keys(dynamicFiles).forEach(fieldName => {
+      const fieldFiles = dynamicFiles[fieldName];
+      fieldFiles.forEach(file => {
+        documents.push({
+          type: `Dynamic: ${fieldName}`,
+          name: file.originalname,
+          url: `/uploads/${file.filename}`,
+          status: 'Pending'
+        });
+      });
+      // Store file URLs in dynamicFields
+      if (!dynamicFields[fieldName]) {
+        dynamicFields[fieldName] = [];
+      }
+      dynamicFields[fieldName] = fieldFiles.map(f => ({
+        name: f.originalname,
+        url: `/uploads/${f.filename}`
+      }));
+    });
     
     // Create application
     const application = await Application.create({

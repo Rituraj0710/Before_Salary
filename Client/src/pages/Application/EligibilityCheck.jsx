@@ -3,13 +3,21 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { CalendarIcon, DevicePhoneMobileIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
+import api from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 
 const EligibilityCheck = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { sendOTP, verifyOTP, user } = useAuth();
+
+  // Extract loanId from URL query params
+  const searchParams = new URLSearchParams(location.search);
+  const loanId = searchParams.get('loanId');
 
   // Eligibility Form State
   const [formData, setFormData] = useState({
+    name: user?.name || '',
     pancard: '',
     dob: '',
     gender: 'MALE',
@@ -24,6 +32,15 @@ const EligibilityCheck = () => {
   });
 
   const [errors, setErrors] = useState({});
+
+  // OTP-related state (for potential future use, but currently not shown in UI)
+  const [otpStep, setOtpStep] = useState('email');
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState('');
+  const [devOtp, setDevOtp] = useState(null);
+  const [otpTimer, setOtpTimer] = useState(0);
 
   // Pre-fill form if coming from loan detail page
   useEffect(() => {
@@ -133,6 +150,12 @@ const EligibilityCheck = () => {
   const validateForm = () => {
     const newErrors = {};
     
+    // Validate Name
+    const name = (formData.name || '').toString().trim();
+    if (!name) {
+      newErrors.name = 'Name is required';
+    }
+    
     // Validate Pancard
     const pancard = (formData.pancard || '').toString().trim();
     if (!pancard) {
@@ -219,7 +242,8 @@ const EligibilityCheck = () => {
     try {
       // Submit eligibility data to database
       const eligibilityData = {
-        email: verifiedEmail || email,
+        name: formData.name,
+        email: verifiedEmail || email || formData.personalEmail,
         loanId: loanId || null,
         pancard: formData.pancard,
         dob: formData.dob,
@@ -243,24 +267,11 @@ const EligibilityCheck = () => {
         sessionStorage.setItem('eligibilityData', JSON.stringify(formData));
         sessionStorage.removeItem('emailVerified');
         
-        // If loanId is present, navigate to loan detail page
+        // Always navigate to the 5-step application form
+        // Include loanId as query parameter if it exists
         if (loanId) {
-          try {
-            const allLoansResponse = await api.get('/loans');
-            const loan = allLoansResponse.data.data?.find(l => l._id === loanId);
-            if (loan?.slug) {
-              navigate(`/loans/${loan.slug}`);
-            } else if (loan) {
-              navigate(`/loans/${loanId}`);
-            } else {
-              toast.error('Loan not found');
-            }
-          } catch (error) {
-            console.error('Error fetching loan:', error);
-            toast.error('Error loading loan details');
-          }
+          navigate(`/apply?loanId=${loanId}`, { state: { eligibilityData: formData } });
         } else {
-          // If no loanId, navigate to full application form
           navigate('/apply', { state: { eligibilityData: formData } });
         }
       } else {
@@ -297,6 +308,26 @@ const EligibilityCheck = () => {
             <div className="grid md:grid-cols-2 gap-8">
               {/* Left Column */}
               <div className="space-y-6">
+                {/* Name */}
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-2">
+                    Full Name<span className="text-red-200">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder="ENTER YOUR FULL NAME*"
+                    className={`w-full px-4 py-3 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white font-medium ${
+                      errors.name ? 'border-2 border-red-300' : ''
+                    }`}
+                  />
+                  {errors.name && (
+                    <p className="text-red-200 text-xs mt-1">{errors.name}</p>
+                  )}
+                </div>
+
                 {/* Pancard */}
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">

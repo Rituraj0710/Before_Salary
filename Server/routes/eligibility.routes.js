@@ -1,5 +1,6 @@
 import express from 'express';
 import Eligibility from '../models/Eligibility.model.js';
+import { protect, authorize } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
@@ -9,6 +10,7 @@ const router = express.Router();
 router.post('/', async (req, res) => {
   try {
     const {
+      name,
       email,
       loanId,
       pancard,
@@ -25,7 +27,7 @@ router.post('/', async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!email || !pancard || !dob || !gender || !personalEmail || !employmentType || !netMonthlyIncome || !pinCode) {
+    if (!name || !email || !pancard || !dob || !gender || !personalEmail || !employmentType || !netMonthlyIncome || !pinCode) {
       return res.status(400).json({
         success: false,
         message: 'Please fill all required fields'
@@ -42,6 +44,7 @@ router.post('/', async (req, res) => {
 
     // Create eligibility record
     const eligibility = await Eligibility.create({
+      name: name.trim(),
       email: email.toLowerCase().trim(),
       loanId: loanId || null,
       pancard: pancard.toUpperCase().trim(),
@@ -75,7 +78,7 @@ router.post('/', async (req, res) => {
 // @route   GET /api/eligibility
 // @desc    Get all eligibility checks (admin only)
 // @access  Private/Admin
-router.get('/', async (req, res) => {
+router.get('/', protect, authorize('admin'), async (req, res) => {
   try {
     const { page = 1, limit = 10, email, loanId } = req.query;
     const query = {};
@@ -114,10 +117,82 @@ router.get('/', async (req, res) => {
   }
 });
 
+// @route   PUT /api/eligibility/:id/approve
+// @desc    Approve eligibility check
+// @access  Private/Admin
+// NOTE: This must come before /:id route to avoid route conflicts
+router.put('/:id/approve', protect, authorize('admin'), async (req, res) => {
+  try {
+    const eligibility = await Eligibility.findByIdAndUpdate(
+      req.params.id,
+      { status: 'approved' },
+      { new: true }
+    ).populate('loanId', 'name slug');
+
+    if (!eligibility) {
+      return res.status(404).json({
+        success: false,
+        message: 'Eligibility check not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Eligibility approved successfully',
+      data: eligibility
+    });
+  } catch (error) {
+    console.error('Error approving eligibility:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+});
+
+// @route   PUT /api/eligibility/:id/reject
+// @desc    Reject eligibility check
+// @access  Private/Admin
+// NOTE: This must come before /:id route to avoid route conflicts
+router.put('/:id/reject', protect, authorize('admin'), async (req, res) => {
+  try {
+    const { rejectionReason } = req.body;
+    
+    const eligibility = await Eligibility.findByIdAndUpdate(
+      req.params.id,
+      { 
+        status: 'rejected',
+        rejectionReason: rejectionReason || null
+      },
+      { new: true }
+    ).populate('loanId', 'name slug');
+
+    if (!eligibility) {
+      return res.status(404).json({
+        success: false,
+        message: 'Eligibility check not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Eligibility rejected successfully',
+      data: eligibility
+    });
+  } catch (error) {
+    console.error('Error rejecting eligibility:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+});
+
 // @route   GET /api/eligibility/:id
 // @desc    Get single eligibility check
 // @access  Private/Admin
-router.get('/:id', async (req, res) => {
+// NOTE: This must come after specific routes like /approve and /reject
+router.get('/:id', protect, authorize('admin'), async (req, res) => {
   try {
     const eligibility = await Eligibility.findById(req.params.id)
       .populate('loanId', 'name slug');

@@ -53,6 +53,9 @@ export const uploadMultiple = upload.fields([
   { name: 'otherDocuments', maxCount: 10 }
 ]);
 
+// Upload handler that accepts all files (for dynamic file fields)
+export const uploadAny = upload.any();
+
 // Image-only file filter for logo/favicon uploads
 const imageFileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|gif|svg|webp/;

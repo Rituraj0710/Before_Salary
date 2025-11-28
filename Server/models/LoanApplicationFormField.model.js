@@ -49,6 +49,11 @@ const loanApplicationFormFieldSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  section: {
+    type: String,
+    enum: ['employment', 'loanDetails', 'documents'],
+    default: 'employment'
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -71,6 +76,7 @@ loanApplicationFormFieldSchema.pre('validate', function(next) {
 // Index for efficient queries
 loanApplicationFormFieldSchema.index({ loanId: 1, order: 1 });
 loanApplicationFormFieldSchema.index({ categoryId: 1, order: 1 });
+loanApplicationFormFieldSchema.index({ categoryId: 1, section: 1, order: 1 });
 
 export default mongoose.model('LoanApplicationFormField', loanApplicationFormFieldSchema);
 
