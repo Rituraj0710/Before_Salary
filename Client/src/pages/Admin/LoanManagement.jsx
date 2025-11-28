@@ -564,7 +564,6 @@ const LoanManagement = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Interest Rate</th>
@@ -576,7 +575,6 @@ const LoanManagement = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {loans.map((loan) => (
                 <tr key={loan._id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{loan.order || 0}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{loan.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{loan.type}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -586,9 +584,11 @@ const LoanManagement = () => {
                     ₹{loan.minLoanAmount?.toLocaleString()} - ₹{loan.maxLoanAmount?.toLocaleString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      loan.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        loan.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}
+                    >
                       {loan.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>

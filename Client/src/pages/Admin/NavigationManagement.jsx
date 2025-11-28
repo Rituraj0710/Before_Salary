@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../utils/api';
 import toast from 'react-hot-toast';
-import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, ArrowUpIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const NavigationManagement = () => {
   const [navItems, setNavItems] = useState([]);
@@ -147,7 +147,6 @@ const NavigationManagement = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Label</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Path</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Visibility</th>
@@ -155,33 +154,16 @@ const NavigationManagement = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {sortedItems.map((item, index) => (
+              {sortedItems.map((item) => (
                 <tr key={item._id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-900">{item.order || index + 1}</span>
-                      <button
-                        onClick={() => handleMove(item._id, 'up')}
-                        disabled={index === 0}
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                      >
-                        <ArrowUpIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleMove(item._id, 'down')}
-                        disabled={index === sortedItems.length - 1}
-                        className="text-gray-400 hover:text-gray-600 disabled:opacity-30"
-                      >
-                        <ArrowDownIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.label}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.path}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      item.isVisible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        item.isVisible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}
+                    >
                       {item.isVisible ? 'Visible' : 'Hidden'}
                     </span>
                   </td>
