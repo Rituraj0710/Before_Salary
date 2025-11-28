@@ -124,19 +124,31 @@ const ApplyLoan = () => {
     }
   }, [loanId]);
 
-  // Refetch dynamic fields when selectedLoan changes
+  // Refetch dynamic fields when selectedLoan or categories change
   useEffect(() => {
-    if (selectedLoan) {
-      const categoryId = selectedLoan.category?._id || selectedLoan.category || null;
-      if (categoryId) {
-        console.log('Selected loan changed, fetching fields for category:', categoryId);
-        fetchDynamicFields(categoryId);
-      } else {
-        console.warn('Selected loan has no category:', selectedLoan.name);
-        setDynamicFields([]);
+    if (!selectedLoan) return;
+
+    // Preferred: use explicit category relation on loan
+    let categoryId = selectedLoan.category?._id || selectedLoan.category || null;
+
+    // Fallback: try to match loan type/name to a category by name
+    if (!categoryId && categories.length > 0) {
+      const loanType = (selectedLoan.type || '').toLowerCase();
+      const loanName = (selectedLoan.name || '').toLowerCase();
+      const matchedCategory = categories.find(
+        (c) =>
+          (c.name || '').toLowerCase() === loanType ||
+          (c.name || '').toLowerCase() === loanName
+      );
+      if (matchedCategory) {
+        categoryId = matchedCategory._id;
+        console.log('Matched loan to category by name/type:', matchedCategory.name, matchedCategory._id);
       }
     }
-  }, [selectedLoan?._id, selectedLoan?.category]);
+
+    console.log('Resolved categoryId for selectedLoan:', categoryId || 'NONE', 'loanId:', selectedLoan._id);
+    fetchDynamicFields(categoryId, selectedLoan._id);
+  }, [selectedLoan?._id, selectedLoan?.category, selectedLoan?.type, selectedLoan?.name, categories.length]);
 
   useEffect(() => {
     fetchCategories();
@@ -166,39 +178,41 @@ const ApplyLoan = () => {
       const loan = response.data.data.find(l => l._id === id);
       if (loan) {
         setSelectedLoan(loan);
-        // Fetch dynamic fields for the loan's category
-        // Handle both populated category object and category ID string
-        const categoryId = loan.category?._id || loan.category || null;
-        if (categoryId) {
-          console.log('Fetching dynamic fields for category:', categoryId);
-          fetchDynamicFields(categoryId);
-        } else {
-          console.warn('Loan has no category assigned:', loan.name);
-          setDynamicFields([]);
-        }
+        // Ensure formData has the current loanId
+        setFormData(prev => ({ ...prev, loanId: loan._id }));
+        // Dynamic fields will be fetched by the selectedLoan effect
       }
     } catch (error) {
       console.error('Error fetching loan:', error);
     }
   };
 
-  const fetchDynamicFields = async (categoryId) => {
-    if (!categoryId) {
-      console.warn('No categoryId provided to fetchDynamicFields');
-      setDynamicFields([]);
-      return;
-    }
+  const fetchDynamicFields = async (categoryId, loanId) => {
     try {
       setLoadingFields(true);
-      console.log('Fetching form fields for categoryId:', categoryId);
-      const response = await api.get(`/form-fields/category/${categoryId}`);
-      const fields = response.data.data || [];
-      console.log('Fetched dynamic fields:', fields.length, 'fields');
+      let fields = [];
+
+      // Try by category first (new configuration)
+      if (categoryId) {
+        console.log('Fetching form fields for categoryId:', categoryId);
+        const response = await api.get(`/form-fields/category/${categoryId}`);
+        fields = response.data.data || [];
+      }
+
+      // Fallback: if no fields by category, try loan-specific fields (backward compatibility)
+      if ((!fields || fields.length === 0) && loanId) {
+        console.log('No category fields found, fetching form fields for loanId:', loanId);
+        const loanResponse = await api.get(`/form-fields/loan/${loanId}`);
+        fields = loanResponse.data.data || [];
+      }
+
+      console.log('Fetched dynamic fields total:', fields.length);
       console.log('Fields by section:', {
         employment: fields.filter(f => f.section === 'employment').length,
         loanDetails: fields.filter(f => f.section === 'loanDetails').length,
         documents: fields.filter(f => f.section === 'documents').length
       });
+
       setDynamicFields(fields);
     } catch (error) {
       console.error('Error fetching dynamic fields:', error);

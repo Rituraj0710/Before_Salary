@@ -19,7 +19,7 @@ import AuthenticationSettings from './AuthenticationSettings';
 import FAQManagement from './FAQManagement';
 import Categories from './Categories';
 import UserFormLoanDetail from './UserFormLoanDetail';
-import VerifiedUsers from './VerifiedUsers';
+// import VerifiedUsers from './VerifiedUsers';
 import EligibilityManagement from './EligibilityManagement';
 
 const AdminDashboard = () => {
@@ -268,10 +268,10 @@ const AdminDashboard = () => {
         </>
       )}
 
-      {/* Verified Users Tab */}
+      {/* Verified Users Tab
       {activeTab === 'verified-users' && (
         <VerifiedUsers />
-      )}
+      )} */}
 
       {/* Loan Management Tab */}
       {activeTab === 'loans' && (

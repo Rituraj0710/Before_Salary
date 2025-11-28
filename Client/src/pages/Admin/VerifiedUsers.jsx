@@ -1,114 +1,114 @@
-import React, { useEffect, useState } from 'react';
-import api from '../../utils/api';
-import toast from 'react-hot-toast';
+// import React, { useEffect, useState } from 'react';
+// import api from '../../utils/api';
+// import toast from 'react-hot-toast';
 
-const VerifiedUsers = () => {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
+// const VerifiedUsers = () => {
+//   const [users, setUsers] = useState([]);
+//   const [loading, setLoading] = useState(true);
 
-  // Helper to check if user is verified (by OTP or other means)
-  const isUserVerified = (user) => {
-    // Primary: new schema uses nested isVerified.email
-    if (user?.isVerified?.email === true) return true;
+//   // Helper to check if user is verified (by OTP or other means)
+//   const isUserVerified = (user) => {
+//     // Primary: new schema uses nested isVerified.email
+//     if (user?.isVerified?.email === true) return true;
 
-    // Backward compatibility: other flags if present
-    return (
-      user.isEmailVerified === true ||
-      user.isEmailVerified === 'true' ||
-      user.isEmailVerified === 'verified' ||
-      user.emailVerified === true ||
-      user.emailVerified === 'true' ||
-      user.emailVerified === 'verified' ||
-      user.otpVerified === true ||
-      user.otpVerified === 'true'
-    );
-  };
+//     // Backward compatibility: other flags if present
+//     return (
+//       user.isEmailVerified === true ||
+//       user.isEmailVerified === 'true' ||
+//       user.isEmailVerified === 'verified' ||
+//       user.emailVerified === true ||
+//       user.emailVerified === 'true' ||
+//       user.emailVerified === 'verified' ||
+//       user.otpVerified === true ||
+//       user.otpVerified === 'true'
+//     );
+//   };
 
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get('/admin/users');
-      let list =
-        res.data?.users ||
-        res.data?.data ||
-        res.data?.data?.users ||
-        [];
+//   const fetchUsers = async () => {
+//     setLoading(true);
+//     try {
+//       const res = await api.get('/admin/users');
+//       let list =
+//         res.data?.users ||
+//         res.data?.data ||
+//         res.data?.data?.users ||
+//         [];
 
-      // Filter only verified users (by email OTP)
-      list = list.filter((user) => isUserVerified(user));
+//       // Filter only verified users (by email OTP)
+//       list = list.filter((user) => isUserVerified(user));
 
-      setUsers(list);
-    } catch (error) {
-      console.error('Failed to fetch users:', error);
-      setUsers([]);
-    }
-    setLoading(false);
-  };
+//       setUsers(list);
+//     } catch (error) {
+//       console.error('Failed to fetch users:', error);
+//       setUsers([]);
+//     }
+//     setLoading(false);
+//   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+//   useEffect(() => {
+//     fetchUsers();
+//   }, []);
 
-  const deleteUser = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
-    try {
-      await api.delete(`/admin/users/${id}`);
-      toast.success('User deleted successfully');
-      fetchUsers();
-    } catch (err) {
-      console.error('Failed to delete user:', err);
-      toast.error('Failed to delete user');
-    }
-  };
+//   const deleteUser = async (id) => {
+//     if (!window.confirm('Are you sure you want to delete this user?')) return;
+//     try {
+//       await api.delete(`/admin/users/${id}`);
+//       toast.success('User deleted successfully');
+//       fetchUsers();
+//     } catch (err) {
+//       console.error('Failed to delete user:', err);
+//       toast.error('Failed to delete user');
+//     }
+//   };
 
-  return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold">Verified Users</h2>
-        <span className="text-lg font-semibold text-gray-700">
-          Total Verified: {users.length}
-        </span>
-      </div>
+//   return (
+//     <div className="p-6">
+//       <div className="flex items-center justify-between mb-4">
+//         <h2 className="text-2xl font-bold">Verified Users</h2>
+//         <span className="text-lg font-semibold text-gray-700">
+//           Total Verified: {users.length}
+//         </span>
+//       </div>
 
-      {loading ? (
-        <div>Loading...</div>
-      ) : users.length === 0 ? (
-        <div>No verified users found.</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white rounded shadow">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="py-2 px-4 border-b text-left">#</th>
-                <th className="py-2 px-4 border-b text-left">Email</th>
-                <th className="py-2 px-4 border-b text-left">Name</th>
-                <th className="py-2 px-4 border-b text-left">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user, idx) => (
-                <tr key={user._id} className="hover:bg-orange-50 transition">
-                  <td className="py-2 px-4 border-b">{idx + 1}</td>
-                  <td className="py-2 px-4 border-b">{user.email}</td>
-                  <td className="py-2 px-4 border-b">{user.name || '-'}</td>
-                  <td className="py-2 px-4 border-b">
-                    <button
-                      onClick={() => deleteUser(user._id)}
-                      className="text-red-600 hover:text-red-800 font-medium"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-};
+//       {loading ? (
+//         <div>Loading...</div>
+//       ) : users.length === 0 ? (
+//         <div>No verified users found.</div>
+//       ) : (
+//         <div className="overflow-x-auto">
+//           <table className="min-w-full bg-white rounded shadow">
+//             <thead className="bg-gray-100">
+//               <tr>
+//                 <th className="py-2 px-4 border-b text-left">#</th>
+//                 <th className="py-2 px-4 border-b text-left">Email</th>
+//                 <th className="py-2 px-4 border-b text-left">Name</th>
+//                 <th className="py-2 px-4 border-b text-left">Actions</th>
+//               </tr>
+//             </thead>
+//             <tbody>
+//               {users.map((user, idx) => (
+//                 <tr key={user._id} className="hover:bg-orange-50 transition">
+//                   <td className="py-2 px-4 border-b">{idx + 1}</td>
+//                   <td className="py-2 px-4 border-b">{user.email}</td>
+//                   <td className="py-2 px-4 border-b">{user.name || '-'}</td>
+//                   <td className="py-2 px-4 border-b">
+//                     <button
+//                       onClick={() => deleteUser(user._id)}
+//                       className="text-red-600 hover:text-red-800 font-medium"
+//                     >
+//                       Delete
+//                     </button>
+//                   </td>
+//                 </tr>
+//               ))}
+//             </tbody>
+//           </table>
+//         </div>
+//       )}
+//     </div>
+//   );
+// };
 
-export default VerifiedUsers;
+// export default VerifiedUsers;
 
 
