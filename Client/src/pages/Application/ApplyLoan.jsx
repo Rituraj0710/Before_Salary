@@ -14,7 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 const ApplyLoan = () => {
-  const { user, sendOTP, verifyOTP } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const loanId = searchParams.get('loanId');
@@ -23,9 +23,6 @@ const ApplyLoan = () => {
   const [loans, setLoans] = useState([]);
   const [selectedLoan, setSelectedLoan] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpVerified, setOtpVerified] = useState(false);
-  const [otp, setOtp] = useState('');
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [categoryError, setCategoryError] = useState(null);
@@ -410,30 +407,9 @@ const ApplyLoan = () => {
     }
   };
 
-  const handleSendOTP = async () => {
-    const result = await sendOTP(formData.personalInfo.email, formData.personalInfo.phone, 'application');
-    if (result.success) {
-      setOtpSent(true);
-      toast.success('OTP sent successfully!');
-    }
-  };
-
-  const handleVerifyOTP = async () => {
-    const result = await verifyOTP(formData.personalInfo.email, formData.personalInfo.phone, otp, 'application');
-    if (result.success) {
-      setOtpVerified(true);
-      toast.success('OTP verified successfully!');
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!otpVerified) {
-      toast.error('Please verify OTP first');
-      return;
-    }
-
     setLoading(true);
     try {
       const formDataToSend = new FormData();
@@ -808,61 +784,11 @@ const ApplyLoan = () => {
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">Loan Details</h2>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Loan Type *
-                  </label>
-                  <select
-                    required
-                    value={formData.loanId}
-                    onChange={(e) => {
-                      setFormData({ ...formData, loanId: e.target.value });
-                      const loan = filteredLoans.find(l => l._id === e.target.value);
-                      setSelectedLoan(loan || null);
-                      // Fetch dynamic fields when loan is selected
-                      if (loan?.category?._id || loan?.category) {
-                        fetchDynamicFields(loan.category._id || loan.category);
-                      } else {
-                        setDynamicFields([]);
-                      }
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Select Loan Type</option>
-                    {filteredLoans.map((loan) => (
-                      <option key={loan._id} value={loan._id}>
-                        {loan.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Category Selection */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Loan Category
-                  </label>
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => {
-                      setSelectedCategory(e.target.value);
-                      // Clear selected loan when category changes
-                      setFormData(f => ({ ...f, loanId: '' }));
-                      setSelectedLoan(null);
-                      setDynamicFields([]);
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Categories</option>
-                    {categories.map(c => (
-                      <option key={c._id} value={c._id}>{c.name} ({c.loanCount || 0})</option>
-                    ))}
-                  </select>
-                  {categoryError && <p className="text-xs text-red-600 mt-2">{categoryError}</p>}
-                </div>
-
                 {selectedLoan && (
                   <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                    <p className="text-sm text-gray-600 mb-2">
+                      <strong>Loan Type:</strong> {selectedLoan.name}
+                    </p>
                     <p className="text-sm text-gray-600 mb-2">
                       <strong>Category:</strong> {selectedLoan.category?.name || 'Uncategorized'}
                     </p>
@@ -870,10 +796,10 @@ const ApplyLoan = () => {
                       <strong>Interest Rate:</strong> {selectedLoan.interestRate?.min}% - {selectedLoan.interestRate?.max}%
                     </p>
                     <p className="text-sm text-gray-600 mb-2">
-                      <strong>Loan Amount Range:</strong> ₹{selectedLoan.minLoanAmount?.toLocaleString()} - ₹{selectedLoan.maxLoanAmount?.toLocaleString()}
+                      <strong>Loan Amount Range:</strong> ₹{selectedLoan.minLoanAmount?.toLocaleString() || '0'} - ₹{selectedLoan.maxLoanAmount?.toLocaleString() || '0'}
                     </p>
                     <p className="text-sm text-gray-600">
-                      <strong>Tenure:</strong> {selectedLoan.minTenure} - {selectedLoan.maxTenure} months
+                      <strong>Tenure:</strong> {selectedLoan.minTenure || 0} - {selectedLoan.maxTenure || 0} months
                     </p>
                   </div>
                 )}
@@ -910,12 +836,12 @@ const ApplyLoan = () => {
               </div>
             )}
 
-            {/* Step 5: Documents & OTP Verification */}
+            {/* Step 5: Documents */}
             {step === 5 && (
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
                   <DocumentIcon className="h-6 w-6 mr-2" />
-                  Documents & Verify
+                  Documents
                 </h2>
 
                 {loadingFields ? (
@@ -947,48 +873,6 @@ const ApplyLoan = () => {
                     )}
                   </div>
                 )}
-
-                {/* OTP Verification */}
-                <div className="bg-gray-50 p-6 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-4">OTP Verification</h3>
-                  {!otpSent ? (
-                    <button
-                      type="button"
-                      onClick={handleSendOTP}
-                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
-                    >
-                      Send OTP
-                    </button>
-                  ) : !otpVerified ? (
-                    <div className="space-y-4">
-                      <p className="text-sm text-gray-600">
-                        OTP sent to {formData.personalInfo.email} and {formData.personalInfo.phone}
-                      </p>
-                      <div className="flex gap-4">
-                        <input
-                          type="text"
-                          value={otp}
-                          onChange={(e) => setOtp(e.target.value)}
-                          placeholder="Enter OTP"
-                          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          maxLength="6"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleVerifyOTP}
-                          className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
-                        >
-                          Verify OTP
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center text-green-600">
-                      <CheckCircleIcon className="h-6 w-6 mr-2" />
-                      <span>OTP Verified Successfully</span>
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 
@@ -1015,7 +899,7 @@ const ApplyLoan = () => {
               ) : (
                 <button
                   type="submit"
-                  disabled={loading || !otpVerified}
+                  disabled={loading}
                   className="flex items-center px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Submitting...' : 'Submit Application'}

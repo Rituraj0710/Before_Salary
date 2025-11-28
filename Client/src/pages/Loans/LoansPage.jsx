@@ -83,11 +83,11 @@ const LoansPage = () => {
               return (
                 <div
                   key={loan._id}
-                  className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition"
+                  className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition flex flex-col h-full"
                 >
-                  {/* Loan Image */}
-                  {imageUrl && (
-                    <div className="w-full h-48 bg-gray-200 overflow-hidden">
+                  {/* Loan Image - Always show placeholder for consistent sizing */}
+                  <div className="w-full h-48 bg-gray-200 overflow-hidden flex-shrink-0">
+                    {imageUrl ? (
                       <img 
                         src={imageUrl} 
                         alt={loan.name}
@@ -96,10 +96,14 @@ const LoansPage = () => {
                           e.target.style.display = 'none';
                         }}
                       />
-                    </div>
-                  )}
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                        <IconComponent className="h-16 w-16 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
                   
-                  <div className="p-6">
+                  <div className="p-6 flex flex-col flex-grow">
                     {/* Icon and Type */}
                     <div className="flex items-center justify-between mb-4">
                       <div className="bg-orange-100 p-3 rounded-lg inline-block">
@@ -117,7 +121,7 @@ const LoansPage = () => {
                     <h3 className="text-xl font-bold text-gray-900 mb-3">{loan.name}</h3>
                     
                     {/* Description */}
-                    <p className="text-gray-600 mb-6 text-sm leading-relaxed line-clamp-3">{loan.description}</p>
+                    <p className="text-gray-600 mb-6 text-sm leading-relaxed line-clamp-3 flex-grow">{loan.description}</p>
                     
                     {/* Loan Details */}
                     <div className="space-y-3 mb-6 border-t border-gray-200 pt-4">
@@ -161,7 +165,7 @@ const LoansPage = () => {
                     {/* Apply Now Button */}
                     <Link
                       to={`/eligibility?loanId=${loan._id}`}
-                      className="w-full border-2 border-blue-600 text-blue-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-blue-50 transition inline-flex items-center justify-center"
+                      className="w-full border-2 border-blue-600 text-blue-600 px-4 py-2.5 rounded-lg font-semibold hover:bg-blue-50 transition inline-flex items-center justify-center mt-auto"
                     >
                       Apply Now
                       <ArrowRightIcon className="ml-1 h-4 w-4" />

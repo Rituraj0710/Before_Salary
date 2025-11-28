@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import { protect } from '../middleware/auth.middleware.js';
 import LoanCategory from '../models/LoanCategory.model.js';
 import Loan from '../models/Loan.model.js';
