@@ -35,7 +35,7 @@ router.get('/category/:categoryId', protect, async (req, res) => {
     const fields = await LoanApplicationFormField.find({ 
       categoryId: req.params.categoryId,
       isActive: true
-    }).sort({ order: 1, createdAt: 1 });
+    }).sort({ section: 1, order: 1, createdAt: 1 });
     res.json({ success: true, data: fields });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -63,7 +63,7 @@ router.get('/:loanId', protect, async (req, res) => {
 router.post('/', protect, async (req, res) => {
   if (!admin(req, res)) return;
   try {
-    const { loanId, categoryId, name, type, width, required, placeholder, label, options, order } = req.body;
+    const { loanId, categoryId, name, type, width, required, placeholder, label, options, order, section } = req.body;
     
     if ((!loanId && !categoryId) || !name || !type) {
       return res.status(400).json({ 
@@ -90,6 +90,7 @@ router.post('/', protect, async (req, res) => {
       label: label?.trim() || name.trim(),
       options: options || [],
       order: order || 0,
+      section: section || 'employment',
       isActive: true
     });
 
@@ -105,7 +106,7 @@ router.post('/', protect, async (req, res) => {
 router.put('/:id', protect, async (req, res) => {
   if (!admin(req, res)) return;
   try {
-    const { name, type, width, required, placeholder, label, options, order, isActive } = req.body;
+    const { name, type, width, required, placeholder, label, options, order, isActive, section } = req.body;
     const field = await LoanApplicationFormField.findById(req.params.id);
     
     if (!field) {
@@ -121,6 +122,7 @@ router.put('/:id', protect, async (req, res) => {
     if (options !== undefined) field.options = options;
     if (order !== undefined) field.order = order;
     if (isActive !== undefined) field.isActive = isActive;
+    if (section !== undefined) field.section = section;
 
     await field.save();
     res.json({ success: true, data: field });

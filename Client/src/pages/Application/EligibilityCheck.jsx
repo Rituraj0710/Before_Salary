@@ -3,13 +3,21 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { CalendarIcon, DevicePhoneMobileIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
+import api from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 
 const EligibilityCheck = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { sendOTP, verifyOTP, user } = useAuth();
+
+  // Extract loanId from URL query params
+  const searchParams = new URLSearchParams(location.search);
+  const loanId = searchParams.get('loanId');
 
   // Eligibility Form State
   const [formData, setFormData] = useState({
+    name: user?.name || '',
     pancard: '',
     dob: '',
     gender: 'MALE',
@@ -24,6 +32,15 @@ const EligibilityCheck = () => {
   });
 
   const [errors, setErrors] = useState({});
+
+  // OTP-related state (for potential future use, but currently not shown in UI)
+  const [otpStep, setOtpStep] = useState('email');
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState('');
+  const [devOtp, setDevOtp] = useState(null);
+  const [otpTimer, setOtpTimer] = useState(0);
 
   // Pre-fill form if coming from loan detail page
   useEffect(() => {
@@ -98,6 +115,10 @@ const EligibilityCheck = () => {
         setVerifiedEmail(email);
         // Don't store in sessionStorage - require fresh verification each time
         toast.success('Email address verified successfully!');
+        // Pre-fill personal email if empty
+        if (!formData.personalEmail) {
+          setFormData(prev => ({ ...prev, personalEmail: email }));
+        }
       } else {
         toast.error(result.message || 'Invalid OTP. Please try again.');
       }
@@ -129,41 +150,63 @@ const EligibilityCheck = () => {
   const validateForm = () => {
     const newErrors = {};
     
-    if (!formData.pancard.trim()) {
-      newErrors.pancard = 'Pancard is required';
-    } else if (formData.pancard.length !== 10) {
-      newErrors.pancard = 'Pancard must be 10 characters';
+    // Validate Name
+    const name = (formData.name || '').toString().trim();
+    if (!name) {
+      newErrors.name = 'Name is required';
     }
     
-    if (!formData.dob.trim()) {
+    // Validate Pancard
+    const pancard = (formData.pancard || '').toString().trim();
+    if (!pancard) {
+      newErrors.pancard = 'Pancard is required';
+    } else if (pancard.length !== 10) {
+      newErrors.pancard = 'Pancard must be exactly 10 characters';
+    }
+    
+    // Validate DOB
+    const dob = (formData.dob || '').toString().trim();
+    if (!dob) {
       newErrors.dob = 'Date of Birth is required';
     }
     
-    if (!formData.personalEmail.trim()) {
+    // Validate Personal Email
+    const personalEmail = (formData.personalEmail || '').toString().trim();
+    if (!personalEmail) {
       newErrors.personalEmail = 'Personal Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.personalEmail)) {
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personalEmail)) {
       newErrors.personalEmail = 'Invalid email format';
     }
     
+    // Validate Employment Type specific fields
     if (formData.employmentType === 'SALARIED') {
-      if (!formData.companyName.trim()) {
-        newErrors.companyName = 'Company Name is required';
+      const companyName = (formData.companyName || '').toString().trim();
+      if (!companyName) {
+        newErrors.companyName = 'Company Name is required for salaried employees';
       }
-      if (!formData.nextSalaryDate.trim()) {
-        newErrors.nextSalaryDate = 'Next Salary Date is required';
+      const nextSalaryDate = (formData.nextSalaryDate || '').toString().trim();
+      if (!nextSalaryDate) {
+        newErrors.nextSalaryDate = 'Next Salary Date is required for salaried employees';
       }
     }
     
-    if (!formData.netMonthlyIncome.trim()) {
+    // Validate Net Monthly Income
+    const netMonthlyIncome = (formData.netMonthlyIncome || '').toString().trim();
+    if (!netMonthlyIncome) {
       newErrors.netMonthlyIncome = 'Net Monthly Income is required';
-    } else if (isNaN(formData.netMonthlyIncome) || parseFloat(formData.netMonthlyIncome) < 0) {
-      newErrors.netMonthlyIncome = 'Invalid income amount';
+    } else {
+      const income = parseFloat(netMonthlyIncome);
+      if (isNaN(income) || income < 0) {
+        newErrors.netMonthlyIncome = 'Please enter a valid income amount (must be a positive number)';
+      }
     }
     
-    if (!formData.pinCode.trim()) {
+    // Validate Pin Code
+    const pinCode = (formData.pinCode || '').toString().trim();
+    if (!pinCode) {
       newErrors.pinCode = 'Pin Code is required';
-    } else if (!/^\d{6}$/.test(formData.pinCode)) {
-      newErrors.pinCode = 'Pin Code must be 6 digits';
+    } else if (!/^\d{6}$/.test(pinCode)) {
+      newErrors.pinCode = 'Pin Code must be exactly 6 digits';
     }
     
     setErrors(newErrors);
@@ -173,15 +216,34 @@ const EligibilityCheck = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!validateForm()) {
-      toast.error('Please fill all required fields correctly');
+    // Validate form and get errors
+    const isValid = validateForm();
+    if (!isValid) {
+      // Show specific error messages
+      const errorMessages = Object.values(errors).filter(msg => msg);
+      if (errorMessages.length > 0) {
+        toast.error(`Please fix the following: ${errorMessages.join(', ')}`);
+      } else {
+        toast.error('Please fill all required fields correctly');
+      }
+      
+      // Scroll to first error field
+      const firstErrorField = Object.keys(errors)[0];
+      if (firstErrorField) {
+        const element = document.querySelector(`[name="${firstErrorField}"]`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.focus();
+        }
+      }
       return;
     }
 
     try {
       // Submit eligibility data to database
       const eligibilityData = {
-        email: verifiedEmail || email,
+        name: formData.name,
+        email: verifiedEmail || email || formData.personalEmail,
         loanId: loanId || null,
         pancard: formData.pancard,
         dob: formData.dob,
@@ -205,24 +267,11 @@ const EligibilityCheck = () => {
         sessionStorage.setItem('eligibilityData', JSON.stringify(formData));
         sessionStorage.removeItem('emailVerified');
         
-        // If loanId is present, navigate to loan detail page
+        // Always navigate to the 5-step application form
+        // Include loanId as query parameter if it exists
         if (loanId) {
-          try {
-            const allLoansResponse = await api.get('/loans');
-            const loan = allLoansResponse.data.data?.find(l => l._id === loanId);
-            if (loan?.slug) {
-              navigate(`/loans/${loan.slug}`);
-            } else if (loan) {
-              navigate(`/loans/${loanId}`);
-            } else {
-              toast.error('Loan not found');
-            }
-          } catch (error) {
-            console.error('Error fetching loan:', error);
-            toast.error('Error loading loan details');
-          }
+          navigate(`/apply?loanId=${loanId}`, { state: { eligibilityData: formData } });
         } else {
-          // If no loanId, navigate to full application form
           navigate('/apply', { state: { eligibilityData: formData } });
         }
       } else {
@@ -259,6 +308,26 @@ const EligibilityCheck = () => {
             <div className="grid md:grid-cols-2 gap-8">
               {/* Left Column */}
               <div className="space-y-6">
+                {/* Name */}
+                <div>
+                  <label className="block text-sm font-semibold text-white mb-2">
+                    Full Name<span className="text-red-200">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder="ENTER YOUR FULL NAME*"
+                    className={`w-full px-4 py-3 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white font-medium ${
+                      errors.name ? 'border-2 border-red-300' : ''
+                    }`}
+                  />
+                  {errors.name && (
+                    <p className="text-red-200 text-xs mt-1">{errors.name}</p>
+                  )}
+                </div>
+
                 {/* Pancard */}
                 <div>
                   <label className="block text-sm font-semibold text-white mb-2">

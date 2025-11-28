@@ -10,7 +10,8 @@ import {
   CreditCardIcon,
   GlobeAltIcon,
   DocumentTextIcon,
-  UserIcon
+  UserIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import Users from './Users';
@@ -31,6 +32,7 @@ const AdminLayout = ({ children, activeTab, setActiveTab }) => {
     { id: 'users', name: 'Verified Users', icon: UserIcon },
     { id: 'loans', name: 'Loan Management', icon: CreditCardIcon },
     { id: 'categories', name: 'Loan Categories', icon: Cog6ToothIcon },
+    { id: 'eligibility', name: 'Eligibility Management', icon: CheckCircleIcon },
     { id: 'user-form-loan-detail', name: 'User Form – Loan Detail', icon: DocumentTextIcon },
     { id: 'hero-banner', name: 'Hero Banner', icon: PhotoIcon },
     { id: 'logo-settings', name: 'Logo Settings', icon: PhotoIcon },

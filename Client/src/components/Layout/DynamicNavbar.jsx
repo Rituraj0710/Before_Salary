@@ -63,8 +63,6 @@ const DynamicNavbar = () => {
           const visibleItems = data.navigation
             .filter(item => item.isVisible !== false)
             .sort((a, b) => (a.order || 0) - (b.order || 0));
-          
-          // Only set navigation items if we have visible items from backend
           setNavItems(visibleItems);
         } else {
           // If no navigation from backend, show empty array (no static defaults)
@@ -76,10 +74,15 @@ const DynamicNavbar = () => {
       }
     } catch (error) {
       console.error('Error fetching navigation:', error);
-      // On error, show empty array - no static defaults
-      setNavItems([]);
-    } finally {
-      setLoading(false);
+      // Use default navigation on error
+      setNavItems([
+        { label: 'Home', path: '/', isPublic: true },
+        { label: 'About Us', path: '/about', isPublic: true },
+        { label: 'Loans', path: '/loans', isPublic: true },
+        { label: 'FAQs', path: '/faq', isPublic: true },
+        { label: 'Repay Loan', path: '/repay', isPublic: true },
+        { label: 'Contact Us', path: '/contact', isPublic: true }
+      ]);
     }
   };
 
@@ -110,8 +113,14 @@ const DynamicNavbar = () => {
             {!loading && publicNavItems.map((item) => (
               <Link
                 key={item.path}
-                to={item.path}
-                className="text-gray-700 hover:text-orange-500 font-medium transition"
+                to={item.path || '/'}
+                className="text-gray-700 hover:text-orange-500 font-medium transition cursor-pointer"
+                onClick={(e) => {
+                  // Ensure navigation works
+                  if (!item.path || item.path === '#') {
+                    e.preventDefault();
+                  }
+                }}
               >
                 {item.label}
               </Link>
@@ -175,8 +184,8 @@ const DynamicNavbar = () => {
             {publicNavItems.map((item) => (
               <Link
                 key={item.path}
-                to={item.path}
-                className="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded"
+                to={item.path || '/'}
+                className="block px-3 py-2 text-gray-700 hover:bg-gray-100 rounded cursor-pointer"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 {item.label}
