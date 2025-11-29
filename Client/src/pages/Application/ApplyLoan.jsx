@@ -34,6 +34,8 @@ const ApplyLoan = () => {
   const [cameraStream, setCameraStream] = useState(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [validatedFields, setValidatedFields] = useState({});
 
   const [formData, setFormData] = useState({
     loanId: loanId || '',
@@ -239,6 +241,8 @@ const ApplyLoan = () => {
           [field]: e.target.value
         }
       });
+      // Validate field in real-time
+      validateField(section, field, e.target.value);
     } else if (section) {
       setFormData({
         ...formData,
@@ -255,6 +259,79 @@ const ApplyLoan = () => {
     }
   };
 
+  const validateField = (section, field, value) => {
+    if (step === 1 && section === 'personalInfo') {
+      const errors = { ...fieldErrors.step1 };
+      const validated = { ...validatedFields.step1 };
+      
+      if (field === 'fullName') {
+        if (!value?.trim()) {
+          errors.fullName = 'Full Name is required';
+          delete validated.fullName;
+        } else {
+          validated.fullName = true;
+          delete errors.fullName;
+        }
+      } else if (field === 'email') {
+        if (!value?.trim()) {
+          errors.email = 'Email is required';
+          delete validated.email;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          errors.email = 'Invalid email format';
+          delete validated.email;
+        } else {
+          validated.email = true;
+          delete errors.email;
+        }
+      } else if (field === 'phone') {
+        const phoneDigits = value?.replace(/\D/g, '') || '';
+        if (!phoneDigits) {
+          errors.phone = 'Phone is required';
+          delete validated.phone;
+        } else if (phoneDigits.length !== 10) {
+          errors.phone = 'Phone must be 10 digits';
+          delete validated.phone;
+        } else {
+          validated.phone = true;
+          delete errors.phone;
+        }
+      } else if (field === 'dateOfBirth') {
+        if (!value) {
+          errors.dateOfBirth = 'Date of Birth is required';
+          delete validated.dateOfBirth;
+        } else {
+          validated.dateOfBirth = true;
+          delete errors.dateOfBirth;
+        }
+      } else if (field === 'pan') {
+        if (!value?.trim()) {
+          errors.pan = 'PAN is required';
+          delete validated.pan;
+        } else if (value.length !== 10) {
+          errors.pan = 'PAN must be 10 characters';
+          delete validated.pan;
+        } else {
+          validated.pan = true;
+          delete errors.pan;
+        }
+      } else if (field === 'aadhar') {
+        if (!value?.trim()) {
+          errors.aadhar = 'Aadhar is required';
+          delete validated.aadhar;
+        } else if (value.length !== 12) {
+          errors.aadhar = 'Aadhar must be 12 digits';
+          delete validated.aadhar;
+        } else {
+          validated.aadhar = true;
+          delete errors.aadhar;
+        }
+      }
+      
+      setFieldErrors(prev => ({ ...prev, step1: errors }));
+      setValidatedFields(prev => ({ ...prev, step1: validated }));
+    }
+  };
+
   const handleNestedChange = (e, section, subsection, field) => {
     setFormData({
       ...formData,
@@ -266,6 +343,36 @@ const ApplyLoan = () => {
         }
       }
     });
+    // Validate field in real-time
+    if (step === 2 && section === 'address') {
+      const errors = { ...fieldErrors.step2 };
+      const validated = { ...validatedFields.step2 };
+      const fieldKey = `${subsection}${field.charAt(0).toUpperCase() + field.slice(1)}`;
+      
+      if (field === 'pincode') {
+        if (!e.target.value?.trim()) {
+          errors[fieldKey] = 'Pincode is required';
+          delete validated[fieldKey];
+        } else if (!/^[0-9]{6}$/.test(e.target.value)) {
+          errors[fieldKey] = 'Pincode must be 6 digits';
+          delete validated[fieldKey];
+        } else {
+          validated[fieldKey] = true;
+          delete errors[fieldKey];
+        }
+      } else {
+        if (!e.target.value?.trim()) {
+          errors[fieldKey] = `${field.charAt(0).toUpperCase() + field.slice(1)} is required`;
+          delete validated[fieldKey];
+        } else {
+          validated[fieldKey] = true;
+          delete errors[fieldKey];
+        }
+      }
+      
+      setFieldErrors(prev => ({ ...prev, step2: errors }));
+      setValidatedFields(prev => ({ ...prev, step2: validated }));
+    }
   };
 
   const handleFileChange = (e, docType) => {
@@ -287,6 +394,26 @@ const ApplyLoan = () => {
         [fieldName]: fieldType === 'File' ? value : value
       }
     });
+    
+    // Validate dynamic field if required
+    const field = dynamicFields.find(f => f.name === fieldName);
+    if (field && field.required) {
+      const stepKey = `step${step}`;
+      const errors = { ...fieldErrors[stepKey] };
+      const validated = { ...validatedFields[stepKey] };
+      const dynamicKey = `dynamic_${fieldName}`;
+      
+      if (!value || (typeof value === 'string' && !value.trim()) || (Array.isArray(value) && value.length === 0)) {
+        errors[dynamicKey] = `${field.label || fieldName} is required`;
+        delete validated[dynamicKey];
+      } else {
+        validated[dynamicKey] = true;
+        delete errors[dynamicKey];
+      }
+      
+      setFieldErrors(prev => ({ ...prev, [stepKey]: errors }));
+      setValidatedFields(prev => ({ ...prev, [stepKey]: validated }));
+    }
   };
 
   const handleDynamicFileChange = (fieldName, files) => {
@@ -297,6 +424,26 @@ const ApplyLoan = () => {
         [fieldName]: Array.from(files)
       }
     });
+    
+    // Validate dynamic file field if required
+    const field = dynamicFields.find(f => f.name === fieldName);
+    if (field && field.required) {
+      const stepKey = `step${step}`;
+      const errors = { ...fieldErrors[stepKey] };
+      const validated = { ...validatedFields[stepKey] };
+      const dynamicKey = `dynamic_${fieldName}`;
+      
+      if (!files || files.length === 0) {
+        errors[dynamicKey] = `${field.label || fieldName} is required`;
+        delete validated[dynamicKey];
+      } else {
+        validated[dynamicKey] = true;
+        delete errors[dynamicKey];
+      }
+      
+      setFieldErrors(prev => ({ ...prev, [stepKey]: errors }));
+      setValidatedFields(prev => ({ ...prev, [stepKey]: validated }));
+    }
   };
 
   // Camera functions
@@ -312,9 +459,16 @@ const ApplyLoan = () => {
       });
       setCameraStream(stream);
       setShowCamera(true);
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+      // Use setTimeout to ensure the video element is rendered before setting stream
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          // Explicitly play the video
+          videoRef.current.play().catch(err => {
+            console.error('Error playing video:', err);
+          });
+        }
+      }, 100);
     } catch (error) {
       console.error('Error accessing camera:', error);
       toast.error('Unable to access camera. Please check permissions.');
@@ -362,6 +516,22 @@ const ApplyLoan = () => {
           }
         });
         
+        // Mark selfie as validated
+        setValidatedFields(prev => ({
+          ...prev,
+          step5: {
+            ...prev.step5,
+            selfie: true
+          }
+        }));
+        setFieldErrors(prev => ({
+          ...prev,
+          step5: {
+            ...prev.step5,
+            selfie: undefined
+          }
+        }));
+        
         toast.success('Selfie captured successfully!');
         stopCamera();
       }
@@ -376,7 +546,25 @@ const ApplyLoan = () => {
         selfie: null
       }
     });
+    // Remove selfie validation
+    setValidatedFields(prev => ({
+      ...prev,
+      step5: {
+        ...prev.step5,
+        selfie: false
+      }
+    }));
   };
+
+  // Ensure video plays when stream is set
+  useEffect(() => {
+    if (showCamera && cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.play().catch(err => {
+        console.error('Error playing video:', err);
+      });
+    }
+  }, [showCamera, cameraStream]);
 
   // Cleanup camera on unmount
   useEffect(() => {
@@ -758,12 +946,294 @@ const ApplyLoan = () => {
     }
   };
 
+  // Validation functions for each step
+  const validateStep1 = () => {
+    const errors = {};
+    const validated = {};
+    
+    if (!formData.personalInfo.fullName?.trim()) {
+      errors.fullName = 'Full Name is required';
+    } else {
+      validated.fullName = true;
+    }
+    
+    if (!formData.personalInfo.email?.trim()) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.personalInfo.email)) {
+      errors.email = 'Invalid email format';
+    } else {
+      validated.email = true;
+    }
+    
+    if (!formData.personalInfo.phone?.trim()) {
+      errors.phone = 'Phone is required';
+    } else if (!/^[0-9]{10}$/.test(formData.personalInfo.phone.replace(/\D/g, ''))) {
+      errors.phone = 'Phone must be 10 digits';
+    } else {
+      validated.phone = true;
+    }
+    
+    if (!formData.personalInfo.dateOfBirth) {
+      errors.dateOfBirth = 'Date of Birth is required';
+    } else {
+      validated.dateOfBirth = true;
+    }
+    
+    if (!formData.personalInfo.pan?.trim()) {
+      errors.pan = 'PAN is required';
+    } else if (formData.personalInfo.pan.length !== 10) {
+      errors.pan = 'PAN must be 10 characters';
+    } else {
+      validated.pan = true;
+    }
+    
+    if (!formData.personalInfo.aadhar?.trim()) {
+      errors.aadhar = 'Aadhar is required';
+    } else if (formData.personalInfo.aadhar.length !== 12) {
+      errors.aadhar = 'Aadhar must be 12 digits';
+    } else {
+      validated.aadhar = true;
+    }
+    
+    setFieldErrors(prev => ({ ...prev, step1: errors }));
+    setValidatedFields(prev => ({ ...prev, step1: validated }));
+    
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateStep2 = () => {
+    const errors = {};
+    const validated = {};
+    
+    // Current address validation
+    if (!formData.address.current.street?.trim()) {
+      errors.currentStreet = 'Street Address is required';
+    } else {
+      validated.currentStreet = true;
+    }
+    
+    if (!formData.address.current.city?.trim()) {
+      errors.currentCity = 'City is required';
+    } else {
+      validated.currentCity = true;
+    }
+    
+    if (!formData.address.current.state?.trim()) {
+      errors.currentState = 'State is required';
+    } else {
+      validated.currentState = true;
+    }
+    
+    if (!formData.address.current.pincode?.trim()) {
+      errors.currentPincode = 'Pincode is required';
+    } else if (!/^[0-9]{6}$/.test(formData.address.current.pincode)) {
+      errors.currentPincode = 'Pincode must be 6 digits';
+    } else {
+      validated.currentPincode = true;
+    }
+    
+    // Permanent address validation
+    if (!formData.address.permanent.street?.trim()) {
+      errors.permanentStreet = 'Street Address is required';
+    } else {
+      validated.permanentStreet = true;
+    }
+    
+    if (!formData.address.permanent.city?.trim()) {
+      errors.permanentCity = 'City is required';
+    } else {
+      validated.permanentCity = true;
+    }
+    
+    if (!formData.address.permanent.state?.trim()) {
+      errors.permanentState = 'State is required';
+    } else {
+      validated.permanentState = true;
+    }
+    
+    if (!formData.address.permanent.pincode?.trim()) {
+      errors.permanentPincode = 'Pincode is required';
+    } else if (!/^[0-9]{6}$/.test(formData.address.permanent.pincode)) {
+      errors.permanentPincode = 'Pincode must be 6 digits';
+    } else {
+      validated.permanentPincode = true;
+    }
+    
+    setFieldErrors(prev => ({ ...prev, step2: errors }));
+    setValidatedFields(prev => ({ ...prev, step2: validated }));
+    
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateStep3 = () => {
+    const errors = {};
+    const validated = {};
+    
+    if (!formData.employmentInfo.employmentType?.trim()) {
+      errors.employmentType = 'Employment Type is required';
+    } else {
+      validated.employmentType = true;
+    }
+    
+    if (!formData.employmentInfo.monthlyIncome?.toString().trim()) {
+      errors.monthlyIncome = 'Monthly Income is required';
+    } else if (isNaN(Number(formData.employmentInfo.monthlyIncome)) || Number(formData.employmentInfo.monthlyIncome) <= 0) {
+      errors.monthlyIncome = 'Monthly Income must be a valid positive number';
+    } else {
+      validated.monthlyIncome = true;
+    }
+    
+    // Validate required dynamic fields
+    const employmentFields = dynamicFields.filter(f => f.section === 'employment' && f.required);
+    employmentFields.forEach(field => {
+      const value = formData.dynamicFields[field.name];
+      if (!value || (typeof value === 'string' && !value.trim()) || (Array.isArray(value) && value.length === 0)) {
+        errors[`dynamic_${field.name}`] = `${field.label || field.name} is required`;
+      } else {
+        validated[`dynamic_${field.name}`] = true;
+      }
+    });
+    
+    setFieldErrors(prev => ({ ...prev, step3: errors }));
+    setValidatedFields(prev => ({ ...prev, step3: validated }));
+    
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateStep4 = () => {
+    const errors = {};
+    const validated = {};
+    
+    if (!formData.loanDetails.loanAmount?.toString().trim()) {
+      errors.loanAmount = 'Loan Amount is required';
+    } else if (isNaN(Number(formData.loanDetails.loanAmount)) || Number(formData.loanDetails.loanAmount) <= 0) {
+      errors.loanAmount = 'Loan Amount must be a valid positive number';
+    } else if (selectedLoan && selectedLoan.minLoanAmount && Number(formData.loanDetails.loanAmount) < selectedLoan.minLoanAmount) {
+      errors.loanAmount = `Loan Amount must be at least ₹${selectedLoan.minLoanAmount.toLocaleString()}`;
+    } else if (selectedLoan && selectedLoan.maxLoanAmount && Number(formData.loanDetails.loanAmount) > selectedLoan.maxLoanAmount) {
+      errors.loanAmount = `Loan Amount must not exceed ₹${selectedLoan.maxLoanAmount.toLocaleString()}`;
+    } else {
+      validated.loanAmount = true;
+    }
+    
+    if (!formData.loanDetails.loanTenure?.toString().trim()) {
+      errors.loanTenure = 'Loan Tenure is required';
+    } else if (isNaN(Number(formData.loanDetails.loanTenure)) || Number(formData.loanDetails.loanTenure) <= 0) {
+      errors.loanTenure = 'Loan Tenure must be a valid positive number';
+    } else if (selectedLoan && selectedLoan.minTenure && Number(formData.loanDetails.loanTenure) < selectedLoan.minTenure) {
+      errors.loanTenure = `Loan Tenure must be at least ${selectedLoan.minTenure} months`;
+    } else if (selectedLoan && selectedLoan.maxTenure && Number(formData.loanDetails.loanTenure) > selectedLoan.maxTenure) {
+      errors.loanTenure = `Loan Tenure must not exceed ${selectedLoan.maxTenure} months`;
+    } else {
+      validated.loanTenure = true;
+    }
+    
+    // Validate required dynamic fields
+    const loanDetailsFields = dynamicFields.filter(f => f.section === 'loanDetails' && f.required);
+    loanDetailsFields.forEach(field => {
+      const value = formData.dynamicFields[field.name];
+      if (!value || (typeof value === 'string' && !value.trim()) || (Array.isArray(value) && value.length === 0)) {
+        errors[`dynamic_${field.name}`] = `${field.label || field.name} is required`;
+      } else {
+        validated[`dynamic_${field.name}`] = true;
+      }
+    });
+    
+    setFieldErrors(prev => ({ ...prev, step4: errors }));
+    setValidatedFields(prev => ({ ...prev, step4: validated }));
+    
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateStep5 = () => {
+    const errors = {};
+    const validated = {};
+    
+    if (!formData.documents.selfie) {
+      errors.selfie = 'Selfie is required';
+    } else {
+      validated.selfie = true;
+    }
+    
+    // Validate required dynamic document fields
+    const documentFields = dynamicFields.filter(f => f.section === 'documents' && f.required);
+    documentFields.forEach(field => {
+      const value = formData.dynamicFields[field.name];
+      if (!value || (Array.isArray(value) && value.length === 0)) {
+        errors[`dynamic_${field.name}`] = `${field.label || field.name} is required`;
+      } else {
+        validated[`dynamic_${field.name}`] = true;
+      }
+    });
+    
+    setFieldErrors(prev => ({ ...prev, step5: errors }));
+    setValidatedFields(prev => ({ ...prev, step5: validated }));
+    
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateCurrentStep = () => {
+    switch (step) {
+      case 1:
+        return validateStep1();
+      case 2:
+        return validateStep2();
+      case 3:
+        return validateStep3();
+      case 4:
+        return validateStep4();
+      case 5:
+        return validateStep5();
+      default:
+        return true;
+    }
+  };
+
+  const isStepValid = () => {
+    switch (step) {
+      case 1:
+        const step1Fields = ['fullName', 'email', 'phone', 'dateOfBirth', 'pan', 'aadhar'];
+        return step1Fields.every(field => validatedFields.step1?.[field]);
+      case 2:
+        const step2Fields = ['currentStreet', 'currentCity', 'currentState', 'currentPincode', 'permanentStreet', 'permanentCity', 'permanentState', 'permanentPincode'];
+        return step2Fields.every(field => validatedFields.step2?.[field]);
+      case 3:
+        const step3Required = ['employmentType', 'monthlyIncome'];
+        const step3Valid = step3Required.every(field => validatedFields.step3?.[field]);
+        // Check dynamic required fields
+        const employmentRequired = dynamicFields.filter(f => f.section === 'employment' && f.required);
+        const dynamicValid = employmentRequired.every(field => validatedFields.step3?.[`dynamic_${field.name}`]);
+        return step3Valid && dynamicValid;
+      case 4:
+        const step4Required = ['loanAmount', 'loanTenure'];
+        const step4Valid = step4Required.every(field => validatedFields.step4?.[field]);
+        // Check dynamic required fields
+        const loanDetailsRequired = dynamicFields.filter(f => f.section === 'loanDetails' && f.required);
+        const loanDynamicValid = loanDetailsRequired.every(field => validatedFields.step4?.[`dynamic_${field.name}`]);
+        return step4Valid && loanDynamicValid;
+      case 5:
+        const step5Valid = validatedFields.step5?.selfie;
+        // Check dynamic required fields
+        const documentRequired = dynamicFields.filter(f => f.section === 'documents' && f.required);
+        const docDynamicValid = documentRequired.every(field => validatedFields.step5?.[`dynamic_${field.name}`]);
+        return step5Valid && docDynamicValid;
+      default:
+        return true;
+    }
+  };
+
   const nextStep = () => {
     // Stop camera if active when leaving step 5
     if (step === 5 && showCamera) {
       stopCamera();
     }
-    if (step < 5) setStep(step + 1);
+    
+    // Validate current step before proceeding
+    if (validateCurrentStep()) {
+      if (step < 5) setStep(step + 1);
+    } else {
+      toast.error('Please fill all required fields before proceeding');
+    }
   };
 
   const prevStep = () => {
@@ -823,78 +1293,126 @@ const ApplyLoan = () => {
                 
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                       Full Name *
+                      {validatedFields.step1?.fullName && (
+                        <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                      )}
                     </label>
                     <input
                       type="text"
                       required
                       value={formData.personalInfo.fullName}
                       onChange={(e) => handleChange(e, 'personalInfo', 'fullName')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        fieldErrors.step1?.fullName ? 'border-red-500' : validatedFields.step1?.fullName ? 'border-green-500' : 'border-gray-300'
+                      }`}
                     />
+                    {fieldErrors.step1?.fullName && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.step1.fullName}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                       Email *
+                      {validatedFields.step1?.email && (
+                        <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                      )}
                     </label>
                     <input
                       type="email"
                       required
                       value={formData.personalInfo.email}
                       onChange={(e) => handleChange(e, 'personalInfo', 'email')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        fieldErrors.step1?.email ? 'border-red-500' : validatedFields.step1?.email ? 'border-green-500' : 'border-gray-300'
+                      }`}
                     />
+                    {fieldErrors.step1?.email && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.step1.email}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                       Phone *
+                      {validatedFields.step1?.phone && (
+                        <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                      )}
                     </label>
                     <input
                       type="tel"
                       required
                       value={formData.personalInfo.phone}
                       onChange={(e) => handleChange(e, 'personalInfo', 'phone')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        fieldErrors.step1?.phone ? 'border-red-500' : validatedFields.step1?.phone ? 'border-green-500' : 'border-gray-300'
+                      }`}
                     />
+                    {fieldErrors.step1?.phone && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.step1.phone}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                       Date of Birth *
+                      {validatedFields.step1?.dateOfBirth && (
+                        <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                      )}
                     </label>
                     <input
                       type="date"
                       required
                       value={formData.personalInfo.dateOfBirth}
                       onChange={(e) => handleChange(e, 'personalInfo', 'dateOfBirth')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        fieldErrors.step1?.dateOfBirth ? 'border-red-500' : validatedFields.step1?.dateOfBirth ? 'border-green-500' : 'border-gray-300'
+                      }`}
                     />
+                    {fieldErrors.step1?.dateOfBirth && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.step1.dateOfBirth}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                       PAN *
+                      {validatedFields.step1?.pan && (
+                        <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                      )}
                     </label>
                     <input
                       type="text"
                       required
                       value={formData.personalInfo.pan}
                       onChange={(e) => handleChange(e, 'personalInfo', 'pan')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase"
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 uppercase ${
+                        fieldErrors.step1?.pan ? 'border-red-500' : validatedFields.step1?.pan ? 'border-green-500' : 'border-gray-300'
+                      }`}
                       maxLength="10"
                     />
+                    {fieldErrors.step1?.pan && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.step1.pan}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                       Aadhar *
+                      {validatedFields.step1?.aadhar && (
+                        <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                      )}
                     </label>
                     <input
                       type="text"
                       required
                       value={formData.personalInfo.aadhar}
                       onChange={(e) => handleChange(e, 'personalInfo', 'aadhar')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        fieldErrors.step1?.aadhar ? 'border-red-500' : validatedFields.step1?.aadhar ? 'border-green-500' : 'border-gray-300'
+                      }`}
                       maxLength="12"
                     />
+                    {fieldErrors.step1?.aadhar && (
+                      <p className="text-xs text-red-500 mt-1">{fieldErrors.step1.aadhar}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -912,53 +1430,85 @@ const ApplyLoan = () => {
                   <h3 className="text-lg font-semibold mb-4">Current Address</h3>
                   <div className="grid md:grid-cols-2 gap-6 mb-6">
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                         Street Address *
+                        {validatedFields.step2?.currentStreet && (
+                          <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                        )}
                       </label>
                       <input
                         type="text"
                         required
                         value={formData.address.current.street}
                         onChange={(e) => handleNestedChange(e, 'address', 'current', 'street')}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          fieldErrors.step2?.currentStreet ? 'border-red-500' : validatedFields.step2?.currentStreet ? 'border-green-500' : 'border-gray-300'
+                        }`}
                       />
+                      {fieldErrors.step2?.currentStreet && (
+                        <p className="text-xs text-red-500 mt-1">{fieldErrors.step2.currentStreet}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                         City *
+                        {validatedFields.step2?.currentCity && (
+                          <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                        )}
                       </label>
                       <input
                         type="text"
                         required
                         value={formData.address.current.city}
                         onChange={(e) => handleNestedChange(e, 'address', 'current', 'city')}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          fieldErrors.step2?.currentCity ? 'border-red-500' : validatedFields.step2?.currentCity ? 'border-green-500' : 'border-gray-300'
+                        }`}
                       />
+                      {fieldErrors.step2?.currentCity && (
+                        <p className="text-xs text-red-500 mt-1">{fieldErrors.step2.currentCity}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                         State *
+                        {validatedFields.step2?.currentState && (
+                          <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                        )}
                       </label>
                       <input
                         type="text"
                         required
                         value={formData.address.current.state}
                         onChange={(e) => handleNestedChange(e, 'address', 'current', 'state')}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          fieldErrors.step2?.currentState ? 'border-red-500' : validatedFields.step2?.currentState ? 'border-green-500' : 'border-gray-300'
+                        }`}
                       />
+                      {fieldErrors.step2?.currentState && (
+                        <p className="text-xs text-red-500 mt-1">{fieldErrors.step2.currentState}</p>
+                      )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                         Pincode *
+                        {validatedFields.step2?.currentPincode && (
+                          <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                        )}
                       </label>
                       <input
                         type="text"
                         required
                         value={formData.address.current.pincode}
                         onChange={(e) => handleNestedChange(e, 'address', 'current', 'pincode')}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          fieldErrors.step2?.currentPincode ? 'border-red-500' : validatedFields.step2?.currentPincode ? 'border-green-500' : 'border-gray-300'
+                        }`}
                         maxLength="6"
                       />
+                      {fieldErrors.step2?.currentPincode && (
+                        <p className="text-xs text-red-500 mt-1">{fieldErrors.step2.currentPincode}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1055,48 +1605,96 @@ const ApplyLoan = () => {
                   <div className="grid md:grid-cols-2 gap-6">
                     {/* Static Employment Type Field */}
                     <div className="md:col-span-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                         Employment Type <span className="text-red-500">*</span>
+                        {validatedFields.step3?.employmentType && (
+                          <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                        )}
                       </label>
                       <select
                         required
                         value={formData.employmentInfo.employmentType}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          employmentInfo: {
-                            ...formData.employmentInfo,
-                            employmentType: e.target.value
+                        onChange={(e) => {
+                          setFormData({
+                            ...formData,
+                            employmentInfo: {
+                              ...formData.employmentInfo,
+                              employmentType: e.target.value
+                            }
+                          });
+                          // Validate in real-time
+                          const errors = { ...fieldErrors.step3 };
+                          const validated = { ...validatedFields.step3 };
+                          if (e.target.value) {
+                            validated.employmentType = true;
+                            delete errors.employmentType;
+                          } else {
+                            errors.employmentType = 'Employment Type is required';
+                            delete validated.employmentType;
                           }
-                        })}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          setFieldErrors(prev => ({ ...prev, step3: errors }));
+                          setValidatedFields(prev => ({ ...prev, step3: validated }));
+                        }}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          fieldErrors.step3?.employmentType ? 'border-red-500' : validatedFields.step3?.employmentType ? 'border-green-500' : 'border-gray-300'
+                        }`}
                       >
                         <option value="">Select Employment Type</option>
                         <option value="Salaried">Salaried</option>
                         <option value="Self-Employed">Self-Employed</option>
                         <option value="Business">Business</option>
                       </select>
+                      {fieldErrors.step3?.employmentType && (
+                        <p className="text-xs text-red-500 mt-1">{fieldErrors.step3.employmentType}</p>
+                      )}
                     </div>
                     
                     {/* Static Monthly Income Field */}
                     <div className="md:col-span-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                         Monthly Income (₹) <span className="text-red-500">*</span>
+                        {validatedFields.step3?.monthlyIncome && (
+                          <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                        )}
                       </label>
                       <input
                         type="number"
                         required
                         value={formData.employmentInfo.monthlyIncome}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          employmentInfo: {
-                            ...formData.employmentInfo,
-                            monthlyIncome: e.target.value
+                        onChange={(e) => {
+                          setFormData({
+                            ...formData,
+                            employmentInfo: {
+                              ...formData.employmentInfo,
+                              monthlyIncome: e.target.value
+                            }
+                          });
+                          // Validate in real-time
+                          const errors = { ...fieldErrors.step3 };
+                          const validated = { ...validatedFields.step3 };
+                          const income = Number(e.target.value);
+                          if (!e.target.value?.toString().trim()) {
+                            errors.monthlyIncome = 'Monthly Income is required';
+                            delete validated.monthlyIncome;
+                          } else if (isNaN(income) || income <= 0) {
+                            errors.monthlyIncome = 'Monthly Income must be a valid positive number';
+                            delete validated.monthlyIncome;
+                          } else {
+                            validated.monthlyIncome = true;
+                            delete errors.monthlyIncome;
                           }
-                        })}
+                          setFieldErrors(prev => ({ ...prev, step3: errors }));
+                          setValidatedFields(prev => ({ ...prev, step3: validated }));
+                        }}
                         min="0"
                         placeholder="Enter your monthly income"
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          fieldErrors.step3?.monthlyIncome ? 'border-red-500' : validatedFields.step3?.monthlyIncome ? 'border-green-500' : 'border-gray-300'
+                        }`}
                       />
+                      {fieldErrors.step3?.monthlyIncome && (
+                        <p className="text-xs text-red-500 mt-1">{fieldErrors.step3.monthlyIncome}</p>
+                      )}
                     </div>
                     
                     {/* Dynamic Employment Fields */}
@@ -1158,48 +1756,112 @@ const ApplyLoan = () => {
                   <div className="grid md:grid-cols-2 gap-6">
                     {/* Static Loan Amount Field */}
                     <div className="md:col-span-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                         Loan Amount (₹) <span className="text-red-500">*</span>
+                        {validatedFields.step4?.loanAmount && (
+                          <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                        )}
                       </label>
                       <input
                         type="number"
                         required
                         value={formData.loanDetails.loanAmount}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          loanDetails: {
-                            ...formData.loanDetails,
-                            loanAmount: e.target.value
+                        onChange={(e) => {
+                          setFormData({
+                            ...formData,
+                            loanDetails: {
+                              ...formData.loanDetails,
+                              loanAmount: e.target.value
+                            }
+                          });
+                          // Validate in real-time
+                          const errors = { ...fieldErrors.step4 };
+                          const validated = { ...validatedFields.step4 };
+                          const amount = Number(e.target.value);
+                          if (!e.target.value?.toString().trim()) {
+                            errors.loanAmount = 'Loan Amount is required';
+                            delete validated.loanAmount;
+                          } else if (isNaN(amount) || amount <= 0) {
+                            errors.loanAmount = 'Loan Amount must be a valid positive number';
+                            delete validated.loanAmount;
+                          } else if (selectedLoan && selectedLoan.minLoanAmount && amount < selectedLoan.minLoanAmount) {
+                            errors.loanAmount = `Loan Amount must be at least ₹${selectedLoan.minLoanAmount.toLocaleString()}`;
+                            delete validated.loanAmount;
+                          } else if (selectedLoan && selectedLoan.maxLoanAmount && amount > selectedLoan.maxLoanAmount) {
+                            errors.loanAmount = `Loan Amount must not exceed ₹${selectedLoan.maxLoanAmount.toLocaleString()}`;
+                            delete validated.loanAmount;
+                          } else {
+                            validated.loanAmount = true;
+                            delete errors.loanAmount;
                           }
-                        })}
+                          setFieldErrors(prev => ({ ...prev, step4: errors }));
+                          setValidatedFields(prev => ({ ...prev, step4: validated }));
+                        }}
                         min={selectedLoan?.minLoanAmount || 0}
                         max={selectedLoan?.maxLoanAmount || undefined}
                         placeholder={`Enter loan amount (₹${selectedLoan?.minLoanAmount?.toLocaleString() || '0'} - ₹${selectedLoan?.maxLoanAmount?.toLocaleString() || '0'})`}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          fieldErrors.step4?.loanAmount ? 'border-red-500' : validatedFields.step4?.loanAmount ? 'border-green-500' : 'border-gray-300'
+                        }`}
                       />
+                      {fieldErrors.step4?.loanAmount && (
+                        <p className="text-xs text-red-500 mt-1">{fieldErrors.step4.loanAmount}</p>
+                      )}
                     </div>
                     
                     {/* Static Loan Tenure Field */}
                     <div className="md:col-span-1">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                         Loan Tenure (Months) <span className="text-red-500">*</span>
+                        {validatedFields.step4?.loanTenure && (
+                          <CheckCircleIcon className="h-5 w-5 text-green-500 ml-2" />
+                        )}
                       </label>
                       <input
                         type="number"
                         required
                         value={formData.loanDetails.loanTenure}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          loanDetails: {
-                            ...formData.loanDetails,
-                            loanTenure: e.target.value
+                        onChange={(e) => {
+                          setFormData({
+                            ...formData,
+                            loanDetails: {
+                              ...formData.loanDetails,
+                              loanTenure: e.target.value
+                            }
+                          });
+                          // Validate in real-time
+                          const errors = { ...fieldErrors.step4 };
+                          const validated = { ...validatedFields.step4 };
+                          const tenure = Number(e.target.value);
+                          if (!e.target.value?.toString().trim()) {
+                            errors.loanTenure = 'Loan Tenure is required';
+                            delete validated.loanTenure;
+                          } else if (isNaN(tenure) || tenure <= 0) {
+                            errors.loanTenure = 'Loan Tenure must be a valid positive number';
+                            delete validated.loanTenure;
+                          } else if (selectedLoan && selectedLoan.minTenure && tenure < selectedLoan.minTenure) {
+                            errors.loanTenure = `Loan Tenure must be at least ${selectedLoan.minTenure} months`;
+                            delete validated.loanTenure;
+                          } else if (selectedLoan && selectedLoan.maxTenure && tenure > selectedLoan.maxTenure) {
+                            errors.loanTenure = `Loan Tenure must not exceed ${selectedLoan.maxTenure} months`;
+                            delete validated.loanTenure;
+                          } else {
+                            validated.loanTenure = true;
+                            delete errors.loanTenure;
                           }
-                        })}
+                          setFieldErrors(prev => ({ ...prev, step4: errors }));
+                          setValidatedFields(prev => ({ ...prev, step4: validated }));
+                        }}
                         min={selectedLoan?.minTenure || 0}
                         max={selectedLoan?.maxTenure || undefined}
                         placeholder={`Enter tenure (${selectedLoan?.minTenure || 0} - ${selectedLoan?.maxTenure || 0} months)`}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          fieldErrors.step4?.loanTenure ? 'border-red-500' : validatedFields.step4?.loanTenure ? 'border-green-500' : 'border-gray-300'
+                        }`}
                       />
+                      {fieldErrors.step4?.loanTenure && (
+                        <p className="text-xs text-red-500 mt-1">{fieldErrors.step4.loanTenure}</p>
+                      )}
                     </div>
                     
                     {/* Dynamic Fields */}
@@ -1262,6 +1924,7 @@ const ApplyLoan = () => {
                           ref={videoRef}
                           autoPlay
                           playsInline
+                          muted
                           className="w-full h-auto max-h-96 object-contain"
                         />
                         <canvas ref={canvasRef} className="hidden" />
@@ -1290,10 +1953,14 @@ const ApplyLoan = () => {
                   {formData.documents.selfie && !showCamera && (
                     <div className="space-y-4">
                       <div className="relative inline-block">
+                        <div className="flex items-center mb-2">
+                          <CheckCircleIcon className="h-5 w-5 text-green-500 mr-2" />
+                          <span className="text-sm font-medium text-green-700">Selfie captured successfully</span>
+                        </div>
                         <img
                           src={URL.createObjectURL(formData.documents.selfie)}
                           alt="Selfie preview"
-                          className="max-w-full h-auto max-h-64 rounded-lg border-2 border-gray-300"
+                          className="max-w-full h-auto max-h-64 rounded-lg border-2 border-green-500"
                         />
                       </div>
                       <div className="flex gap-3">
@@ -1369,7 +2036,8 @@ const ApplyLoan = () => {
                 <button
                   type="button"
                   onClick={nextStep}
-                  className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                  disabled={!isStepValid()}
+                  className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next
                   <ArrowRightIcon className="h-5 w-5 ml-2" />

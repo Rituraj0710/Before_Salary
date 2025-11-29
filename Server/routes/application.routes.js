@@ -159,6 +159,16 @@ router.post('/', protect, uploadAny, async (req, res) => {
     pushGroup(files.incomeProof, 'Income');
     pushGroup(files.bankStatement, 'Bank Statement');
     pushGroup(files.otherDocuments, 'Other');
+    // Handle selfie file (single file, not array)
+    if (files.selfie && files.selfie.length > 0) {
+      const selfieFile = files.selfie[0];
+      documents.push({
+        type: 'Selfie',
+        name: selfieFile.originalname,
+        url: `/uploads/${selfieFile.filename}`,
+        status: 'Pending'
+      });
+    }
 
     // Handle dynamic fields
     const dynamicFields = applicationData.dynamicFields || {};

@@ -1316,6 +1316,9 @@ const UserFormLoanDetail = () => {
                     {selectedApplication.documents.map((doc, index) => {
                       const docUrl = getDocumentUrl(doc.url);
                       const isPdf = doc.name?.toLowerCase().endsWith('.pdf') || doc.url?.toLowerCase().includes('.pdf');
+                      const isImage = doc.type === 'Selfie' || 
+                                     doc.name?.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/) ||
+                                     doc.url?.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/);
                       return (
                         <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                           <div className="flex items-center justify-between mb-3">
@@ -1334,24 +1337,38 @@ const UserFormLoanDetail = () => {
                             </span>
                           </div>
                           {docUrl ? (
-                            <div className="flex gap-2">
-                              <a
-                                href={docUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex-1 text-center px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors"
-                              >
-                                {isPdf ? 'View PDF' : 'View Document'}
-                              </a>
-                              <a
-                                href={docUrl}
-                                download
-                                className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors"
-                                title="Download"
-                              >
-                                ⬇
-                              </a>
-                            </div>
+                            <>
+                              {isImage && (
+                                <div className="mb-3 rounded-lg overflow-hidden border border-gray-200">
+                                  <img
+                                    src={docUrl}
+                                    alt={doc.type || 'Document'}
+                                    className="w-full h-auto max-h-48 object-contain bg-gray-50"
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              <div className="flex gap-2">
+                                <a
+                                  href={docUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex-1 text-center px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors"
+                                >
+                                  {isPdf ? 'View PDF' : isImage ? 'View Image' : 'View Document'}
+                                </a>
+                                <a
+                                  href={docUrl}
+                                  download
+                                  className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors"
+                                  title="Download"
+                                >
+                                  ⬇
+                                </a>
+                              </div>
+                            </>
                           ) : (
                             <p className="text-xs text-red-500">Document URL not available</p>
                           )}

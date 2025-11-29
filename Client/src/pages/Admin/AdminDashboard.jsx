@@ -684,7 +684,77 @@ const AdminDashboard = () => {
                 </div>
               )}
 
-              {/* Documents */}
+              {/* Selfie Section - Show separately for prominence */}
+              {selectedApplication.documents && selectedApplication.documents.some(doc => doc.type === 'Selfie') && (
+                <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50">
+                  <div className="flex items-center mb-4">
+                    <DocumentArrowUpIcon className="h-5 w-5 text-blue-600 mr-2" />
+                    <h4 className="text-lg font-semibold text-blue-900">Selfie Verification</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedApplication.documents
+                      .filter(doc => doc.type === 'Selfie')
+                      .map((doc, index) => {
+                        const docUrl = getDocumentUrl(doc.url);
+                        return (
+                          <div key={index} className="border border-blue-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="flex-1">
+                                <p className="text-sm font-semibold text-gray-900">{doc.type}</p>
+                                <p className="text-xs text-gray-500 mt-1 break-words">{doc.name}</p>
+                              </div>
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full ml-2 ${
+                                doc.status === 'Verified' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : doc.status === 'Rejected'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {doc.status || 'Pending'}
+                              </span>
+                            </div>
+                            {docUrl ? (
+                              <>
+                                <div className="mb-3 rounded-lg overflow-hidden border border-gray-200">
+                                  <img
+                                    src={docUrl}
+                                    alt="Selfie"
+                                    className="w-full h-auto max-h-64 object-contain bg-gray-50"
+                                    onError={(e) => {
+                                      e.target.style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                                <div className="flex gap-2">
+                                  <a
+                                    href={docUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex-1 text-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                  >
+                                    View Selfie
+                                  </a>
+                                  <a
+                                    href={docUrl}
+                                    download
+                                    className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors"
+                                    title="Download"
+                                  >
+                                    ⬇
+                                  </a>
+                                </div>
+                              </>
+                            ) : (
+                              <p className="text-xs text-red-500">Selfie URL not available</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+
+              {/* Other Documents */}
               {(!selectedApplication.documents || selectedApplication.documents.length === 0) ? (
                 <div className="border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center mb-4">
@@ -694,61 +764,81 @@ const AdminDashboard = () => {
                   <p className="text-sm text-gray-500 text-center py-4">No documents uploaded for this application.</p>
                 </div>
               ) : (
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-center mb-4">
-                    <DocumentArrowUpIcon className="h-5 w-5 text-orange-500 mr-2" />
-                    <h4 className="text-lg font-semibold text-gray-900">
-                      Documents ({selectedApplication.documents.length})
-                    </h4>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {selectedApplication.documents.map((doc, index) => {
-                      const docUrl = getDocumentUrl(doc.url);
-                      const isPdf = doc.name?.toLowerCase().endsWith('.pdf') || doc.url?.toLowerCase().includes('.pdf');
-                      return (
-                        <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex-1">
-                              <p className="text-sm font-semibold text-gray-900">{doc.type}</p>
-                              <p className="text-xs text-gray-500 mt-1 break-words">{doc.name}</p>
+                selectedApplication.documents.filter(doc => doc.type !== 'Selfie').length > 0 && (
+                  <div className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center mb-4">
+                      <DocumentArrowUpIcon className="h-5 w-5 text-orange-500 mr-2" />
+                      <h4 className="text-lg font-semibold text-gray-900">
+                        Other Documents ({selectedApplication.documents.filter(doc => doc.type !== 'Selfie').length})
+                      </h4>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {selectedApplication.documents
+                        .filter(doc => doc.type !== 'Selfie')
+                        .map((doc, index) => {
+                          const docUrl = getDocumentUrl(doc.url);
+                          const isPdf = doc.name?.toLowerCase().endsWith('.pdf') || doc.url?.toLowerCase().includes('.pdf');
+                          const isImage = doc.name?.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/) ||
+                                         doc.url?.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/);
+                          return (
+                            <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex-1">
+                                  <p className="text-sm font-semibold text-gray-900">{doc.type}</p>
+                                  <p className="text-xs text-gray-500 mt-1 break-words">{doc.name}</p>
+                                </div>
+                                <span className={`px-2 py-1 text-xs font-medium rounded-full ml-2 ${
+                                  doc.status === 'Verified' 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : doc.status === 'Rejected'
+                                    ? 'bg-red-100 text-red-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {doc.status || 'Pending'}
+                                </span>
+                              </div>
+                              {docUrl ? (
+                                <>
+                                  {isImage && (
+                                    <div className="mb-3 rounded-lg overflow-hidden border border-gray-200">
+                                      <img
+                                        src={docUrl}
+                                        alt={doc.type || 'Document'}
+                                        className="w-full h-auto max-h-48 object-contain bg-gray-50"
+                                        onError={(e) => {
+                                          e.target.style.display = 'none';
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                  <div className="flex gap-2">
+                                    <a
+                                      href={docUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="flex-1 text-center px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors"
+                                    >
+                                      {isPdf ? 'View PDF' : isImage ? 'View Image' : 'View Document'}
+                                    </a>
+                                    <a
+                                      href={docUrl}
+                                      download
+                                      className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors"
+                                      title="Download"
+                                    >
+                                      ⬇
+                                    </a>
+                                  </div>
+                                </>
+                              ) : (
+                                <p className="text-xs text-red-500">Document URL not available</p>
+                              )}
                             </div>
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ml-2 ${
-                              doc.status === 'Verified' 
-                                ? 'bg-green-100 text-green-800' 
-                                : doc.status === 'Rejected'
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {doc.status || 'Pending'}
-                            </span>
-                          </div>
-                          {docUrl ? (
-                            <div className="flex gap-2">
-                              <a
-                                href={docUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex-1 text-center px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors"
-                              >
-                                {isPdf ? 'View PDF' : 'View Document'}
-                              </a>
-                              <a
-                                href={docUrl}
-                                download
-                                className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors"
-                                title="Download"
-                              >
-                                ⬇
-                              </a>
-                            </div>
-                          ) : (
-                            <p className="text-xs text-red-500">Document URL not available</p>
-                          )}
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                    </div>
                   </div>
-                </div>
+                )
               )}
 
               {/* Rejection Reason */}
