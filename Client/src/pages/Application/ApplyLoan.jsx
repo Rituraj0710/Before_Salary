@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../utils/api';
@@ -10,7 +10,9 @@ import {
   DocumentIcon,
   CheckCircleIcon,
   ArrowRightIcon,
-  ArrowLeftIcon
+  ArrowLeftIcon,
+  CameraIcon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
 const ApplyLoan = () => {
@@ -28,6 +30,10 @@ const ApplyLoan = () => {
   const [categoryError, setCategoryError] = useState(null);
   const [dynamicFields, setDynamicFields] = useState([]);
   const [loadingFields, setLoadingFields] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraStream, setCameraStream] = useState(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
   const [formData, setFormData] = useState({
     loanId: loanId || '',
@@ -77,7 +83,8 @@ const ApplyLoan = () => {
       addressProof: [],
       incomeProof: [],
       bankStatement: [],
-      otherDocuments: []
+      otherDocuments: [],
+      selfie: null
     },
     dynamicFields: {} // Store dynamic field values
   });
@@ -291,6 +298,94 @@ const ApplyLoan = () => {
       }
     });
   };
+
+  // Camera functions
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'user', // Front camera for selfie
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false 
+      });
+      setCameraStream(stream);
+      setShowCamera(true);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      toast.error('Unable to access camera. Please check permissions.');
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setShowCamera(false);
+  };
+
+  const captureSelfie = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+
+    // Set canvas dimensions to match video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Draw video frame to canvas
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Convert canvas to blob, then to File
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], `selfie-${Date.now()}.jpg`, { 
+          type: 'image/jpeg',
+          lastModified: Date.now()
+        });
+        
+        setFormData({
+          ...formData,
+          documents: {
+            ...formData.documents,
+            selfie: file
+          }
+        });
+        
+        toast.success('Selfie captured successfully!');
+        stopCamera();
+      }
+    }, 'image/jpeg', 0.9);
+  };
+
+  const removeSelfie = () => {
+    setFormData({
+      ...formData,
+      documents: {
+        ...formData.documents,
+        selfie: null
+      }
+    });
+  };
+
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [cameraStream]);
 
   const renderDynamicField = (field) => {
     const fieldValue = formData.dynamicFields[field.name] || '';
@@ -595,6 +690,13 @@ const ApplyLoan = () => {
         return;
       }
       
+      // Validate selfie is captured
+      if (!formData.documents.selfie) {
+        toast.error('Please capture a selfie before submitting');
+        setLoading(false);
+        return;
+      }
+      
       const formDataToSend = new FormData();
       
       formDataToSend.append('loanId', formData.loanId);
@@ -605,9 +707,15 @@ const ApplyLoan = () => {
 
       // Append static document files
       Object.keys(formData.documents).forEach(docType => {
-        formData.documents[docType].forEach((file, index) => {
-          formDataToSend.append(docType, file);
-        });
+        const docValue = formData.documents[docType];
+        if (docType === 'selfie' && docValue) {
+          // Selfie is a single file, not an array
+          formDataToSend.append(docType, docValue);
+        } else if (Array.isArray(docValue)) {
+          docValue.forEach((file, index) => {
+            formDataToSend.append(docType, file);
+          });
+        }
       });
 
       // Prepare dynamic fields data (excluding files)
@@ -651,10 +759,18 @@ const ApplyLoan = () => {
   };
 
   const nextStep = () => {
+    // Stop camera if active when leaving step 5
+    if (step === 5 && showCamera) {
+      stopCamera();
+    }
     if (step < 5) setStep(step + 1);
   };
 
   const prevStep = () => {
+    // Stop camera if active when leaving step 5
+    if (step === 5 && showCamera) {
+      stopCamera();
+    }
     if (step > 1) setStep(step - 1);
   };
 
@@ -1118,6 +1234,89 @@ const ApplyLoan = () => {
                   <DocumentIcon className="h-6 w-6 mr-2" />
                   Documents
                 </h2>
+
+                {/* Selfie Capture Section */}
+                <div className="md:col-span-2 border-2 border-dashed border-gray-300 rounded-lg p-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-4">
+                    Selfie <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mb-4">
+                    Please take a selfie using your device camera. This helps us verify your identity.
+                  </p>
+                  
+                  {!formData.documents.selfie && !showCamera && (
+                    <button
+                      type="button"
+                      onClick={startCamera}
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition w-full md:w-auto"
+                    >
+                      <CameraIcon className="h-5 w-5" />
+                      Take Selfie
+                    </button>
+                  )}
+
+                  {showCamera && (
+                    <div className="space-y-4">
+                      <div className="relative bg-black rounded-lg overflow-hidden">
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          playsInline
+                          className="w-full h-auto max-h-96 object-contain"
+                        />
+                        <canvas ref={canvasRef} className="hidden" />
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={captureSelfie}
+                          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                        >
+                          <CameraIcon className="h-5 w-5" />
+                          Capture Photo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={stopCamera}
+                          className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
+                        >
+                          <XMarkIcon className="h-5 w-5" />
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.documents.selfie && !showCamera && (
+                    <div className="space-y-4">
+                      <div className="relative inline-block">
+                        <img
+                          src={URL.createObjectURL(formData.documents.selfie)}
+                          alt="Selfie preview"
+                          className="max-w-full h-auto max-h-64 rounded-lg border-2 border-gray-300"
+                        />
+                      </div>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={startCamera}
+                          className="flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                        >
+                          <CameraIcon className="h-5 w-5" />
+                          Retake
+                        </button>
+                        <button
+                          type="button"
+                          onClick={removeSelfie}
+                          className="flex items-center justify-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                        >
+                          <XMarkIcon className="h-5 w-5" />
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {loadingFields ? (
                   <div className="text-center py-8">
