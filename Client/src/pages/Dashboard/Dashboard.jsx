@@ -14,13 +14,16 @@ import {
   TruckIcon,
   AcademicCapIcon,
   BanknotesIcon,
-  TagIcon
+  TagIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [applications, setApplications] = useState([]);
   const [loans, setLoans] = useState([]);
+  const [eligibilityStatus, setEligibilityStatus] = useState(null);
+  const [loadingEligibility, setLoadingEligibility] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadingLoans, setLoadingLoans] = useState(true);
   const navigate = useNavigate();
@@ -31,10 +34,14 @@ const Dashboard = () => {
       navigate('/verify-otp', { replace: true, state: { redirectTo: '/eligibility' } });
       return;
     }
-    fetchApplications();
-    fetchLoans();
+    if (user) {
+      fetchApplications();
+      fetchLoans();
+      fetchEligibilityStatus();
+    }
     // eslint-disable-next-line
   }, [user]);
+
 
   const fetchApplications = async () => {
     try {
@@ -46,6 +53,7 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
+
 
   const fetchLoans = async () => {
     try {
@@ -65,6 +73,29 @@ const Dashboard = () => {
       console.error('Error fetching loans:', error);
     } finally {
       setLoadingLoans(false);
+    }
+  };
+
+  const fetchEligibilityStatus = async () => {
+    try {
+      setLoadingEligibility(true);
+      const response = await api.get('/eligibility/my-status');
+      const eligibilities = response.data.data || [];
+      // Get the most recent eligibility status
+      if (eligibilities.length > 0) {
+        // Sort by createdAt descending and get the latest one
+        const latestEligibility = eligibilities.sort((a, b) => 
+          new Date(b.createdAt) - new Date(a.createdAt)
+        )[0];
+        setEligibilityStatus(latestEligibility);
+      } else {
+        setEligibilityStatus(null);
+      }
+    } catch (error) {
+      console.error('Error fetching eligibility status:', error);
+      setEligibilityStatus(null);
+    } finally {
+      setLoadingEligibility(false);
     }
   };
 
@@ -98,6 +129,40 @@ const Dashboard = () => {
     }
   };
 
+  const getEligibilityStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'approved':
+        return 'bg-green-100 text-green-800 border-green-300';
+      case 'rejected':
+        return 'bg-red-100 text-red-800 border-red-300';
+      default:
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+    }
+  };
+
+  const getEligibilityStatusIcon = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'approved':
+        return <CheckCircleIcon className="h-6 w-6 text-green-600" />;
+      case 'rejected':
+        return <XCircleIcon className="h-6 w-6 text-red-600" />;
+      default:
+        return <ClockIcon className="h-6 w-6 text-yellow-600" />;
+    }
+  };
+
+  const getEligibilityStatusText = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'approved':
+        return 'Approved';
+      case 'rejected':
+        return 'Declined';
+      default:
+        return 'Pending';
+    }
+  };
+
+
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -105,6 +170,74 @@ const Dashboard = () => {
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="mt-2 text-gray-600">Welcome back, {user?.name}!</p>
         </div>
+
+        {/* Eligibility Status Card */}
+        {!loadingEligibility && (
+          <div className="mb-6">
+            {eligibilityStatus ? (
+              <div className={`bg-white rounded-lg shadow p-6 border-2 ${getEligibilityStatusColor(eligibilityStatus.status)}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-white p-3 rounded-full">
+                      {getEligibilityStatusIcon(eligibilityStatus.status)}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Eligibility Status</h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Your eligibility check has been <span className="font-semibold">{getEligibilityStatusText(eligibilityStatus.status)}</span>
+                        {eligibilityStatus.loanId?.name && (
+                          <span className="ml-1">for {eligibilityStatus.loanId.name}</span>
+                        )}
+                      </p>
+                      {eligibilityStatus.status?.toLowerCase() === 'rejected' && eligibilityStatus.rejectionReason && (
+                        <p className="text-sm text-red-700 mt-2 font-medium">
+                          Reason: {eligibilityStatus.rejectionReason}
+                        </p>
+                      )}
+                      {eligibilityStatus.status?.toLowerCase() === 'approved' && (
+                        <p className="text-sm text-green-700 mt-2 font-medium">
+                          ✓ You are eligible to apply for loans
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`px-4 py-2 inline-flex items-center text-sm font-semibold rounded-full ${getEligibilityStatusColor(eligibilityStatus.status)}`}>
+                      {getEligibilityStatusIcon(eligibilityStatus.status)}
+                      <span className="ml-2">{getEligibilityStatusText(eligibilityStatus.status)}</span>
+                    </span>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Submitted: {new Date(eligibilityStatus.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow p-6 border-2 border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-gray-100 p-3 rounded-full">
+                      <ShieldCheckIcon className="h-6 w-6 text-gray-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900">Eligibility Status</h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        You haven't completed an eligibility check yet.
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    to="/eligibility"
+                    className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition inline-flex items-center gap-2 font-medium"
+                  >
+                    Check Eligibility
+                    <ArrowRightIcon className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow p-6">

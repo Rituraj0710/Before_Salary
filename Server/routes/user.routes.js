@@ -69,6 +69,7 @@ router.get('/applications', async (req, res) => {
   try {
     const applications = await Application.find({ userId: req.user._id })
       .populate('loanId', 'name type')
+      .populate('userId', 'name email')
       .sort({ createdAt: -1 });
 
     res.json({

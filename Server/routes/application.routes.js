@@ -44,6 +44,11 @@ router.post('/', protect, uploadAny, async (req, res) => {
         try { applicationData[f] = JSON.parse(applicationData[f]); } catch { /* ignore */ }
       }
     });
+    
+    // Debug logging for loanDetails
+    console.log('=== Application Creation Debug ===');
+    console.log('loanDetails received:', JSON.stringify(applicationData.loanDetails, null, 2));
+    console.log('loanDetails type:', typeof applicationData.loanDetails);
 
     // Accept loanId or loanProductId
     const loanId = applicationData.loanId || applicationData.loanProductId;
@@ -59,13 +64,73 @@ router.post('/', protect, uploadAny, async (req, res) => {
     // Normalize loanDetails field names from frontend:
     // principal -> loanAmount, tenureMonths -> loanTenure
     const ld = applicationData.loanDetails || {};
-    const loanAmount = Number(ld.loanAmount ?? ld.principal);
-    const loanTenure = Number(ld.loanTenure ?? ld.tenureMonths);
-    if (!Number.isFinite(loanAmount) || loanAmount <= 0) {
-      return res.status(400).json({ success: false, message: 'loanAmount invalid' });
+    
+    // Check if loanDetails is provided
+    if (!ld || typeof ld !== 'object' || Object.keys(ld).length === 0) {
+      console.error('loanDetails missing or empty:', ld);
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Loan details are required. Please provide loan amount and tenure.' 
+      });
     }
-    if (!Number.isFinite(loanTenure) || loanTenure <= 0) {
-      return res.status(400).json({ success: false, message: 'loanTenure invalid' });
+    
+    // Get loanAmount from either loanAmount or principal field
+    const loanAmountRaw = ld.loanAmount ?? ld.principal;
+    const loanTenureRaw = ld.loanTenure ?? ld.tenureMonths;
+    
+    // Check if fields are provided
+    if (loanAmountRaw === undefined || loanAmountRaw === null || loanAmountRaw === '') {
+      console.error('loanAmount is missing:', { loanAmount: ld.loanAmount, principal: ld.principal });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Loan amount is required. Please enter a valid loan amount.' 
+      });
+    }
+    
+    if (loanTenureRaw === undefined || loanTenureRaw === null || loanTenureRaw === '') {
+      console.error('loanTenure is missing:', { loanTenure: ld.loanTenure, tenureMonths: ld.tenureMonths });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Loan tenure is required. Please enter a valid loan tenure in months.' 
+      });
+    }
+    
+    // Convert to numbers
+    const loanAmount = Number(loanAmountRaw);
+    const loanTenure = Number(loanTenureRaw);
+    
+    // Validate that they are valid numbers
+    if (isNaN(loanAmount) || !Number.isFinite(loanAmount)) {
+      console.error('loanAmount is not a valid number:', loanAmountRaw);
+      return res.status(400).json({ 
+        success: false, 
+        message: `Loan amount must be a valid number. Received: ${loanAmountRaw}` 
+      });
+    }
+    
+    if (isNaN(loanTenure) || !Number.isFinite(loanTenure)) {
+      console.error('loanTenure is not a valid number:', loanTenureRaw);
+      return res.status(400).json({ 
+        success: false, 
+        message: `Loan tenure must be a valid number. Received: ${loanTenureRaw}` 
+      });
+    }
+    
+    // Validate that they are positive
+    if (loanAmount <= 0) {
+      console.error('loanAmount is not positive:', loanAmount);
+      return res.status(400).json({ 
+        success: false, 
+        message: `Loan amount must be greater than 0. Received: ${loanAmount}` 
+      });
+    }
+    
+    if (loanTenure <= 0) {
+      console.error('loanTenure is not positive:', loanTenure);
+      return res.status(400).json({ 
+        success: false, 
+        message: `Loan tenure must be greater than 0 months. Received: ${loanTenure}` 
+      });
     }
 
     const annualRate = loan.interestRate?.default ?? loan.interestRate?.min ?? 0;
@@ -119,6 +184,37 @@ router.post('/', protect, uploadAny, async (req, res) => {
       }));
     });
     
+    // Validate and prepare employmentInfo
+    const employmentInfo = applicationData.employmentInfo || {};
+    
+    // Ensure employmentType is a valid string (not empty)
+    if (!employmentInfo.employmentType || employmentInfo.employmentType.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Employment type is required. Please select your employment type.'
+      });
+    }
+    
+    // Ensure monthlyIncome is a valid number
+    const monthlyIncome = Number(employmentInfo.monthlyIncome);
+    if (!monthlyIncome || isNaN(monthlyIncome) || monthlyIncome <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Monthly income is required and must be a valid positive number.'
+      });
+    }
+    
+    // Prepare final employmentInfo object
+    const finalEmploymentInfo = {
+      employmentType: employmentInfo.employmentType.trim(),
+      monthlyIncome: monthlyIncome,
+      companyName: employmentInfo.companyName?.trim() || undefined,
+      designation: employmentInfo.designation?.trim() || undefined,
+      workExperience: employmentInfo.workExperience ? Number(employmentInfo.workExperience) : undefined,
+      businessType: employmentInfo.businessType?.trim() || undefined,
+      businessAge: employmentInfo.businessAge ? Number(employmentInfo.businessAge) : undefined
+    };
+    
     // Create application
     const application = await Application.create({
       userId: req.user._id,
@@ -126,7 +222,7 @@ router.post('/', protect, uploadAny, async (req, res) => {
       loanType: loan.type,
       personalInfo: applicationData.personalInfo,
       address: applicationData.address,
-      employmentInfo: applicationData.employmentInfo,
+      employmentInfo: finalEmploymentInfo,
       loanDetails: {
         loanAmount,
         loanTenure,
@@ -162,6 +258,35 @@ router.post('/', protect, uploadAny, async (req, res) => {
       data: application
     });
   } catch (error) {
+    console.error('=== Error in application creation ===');
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Handle Mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const errors = {};
+      Object.keys(error.errors || {}).forEach(key => {
+        errors[key] = error.errors[key].message;
+      });
+      const errorMessages = Object.values(errors).join(', ');
+      console.error('Validation errors:', errors);
+      
+      // Check specifically for loanAmount validation error
+      if (error.errors && error.errors['loanDetails.loanAmount']) {
+        return res.status(400).json({
+          success: false,
+          message: `Loan amount validation failed: ${error.errors['loanDetails.loanAmount'].message}`
+        });
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: `Validation failed: ${errorMessages}`
+      });
+    }
+    
+    // Handle other errors
     return res.status(500).json({
       success: false,
       message: error.message || 'Server error'

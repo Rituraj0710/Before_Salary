@@ -101,9 +101,26 @@ const UserFormLoanDetail = () => {
     }
   }, [selectedCategory, fetchFormFields]);
 
-  const handleViewDetails = (application) => {
-    setSelectedApplication(application);
-    setShowDetailModal(true);
+  const handleViewDetails = async (application) => {
+    try {
+      // Fetch full application details from API to ensure we have all data
+      const response = await api.get(`/applications/${application._id}`);
+      if (response.data.success) {
+        setSelectedApplication(response.data.data);
+        setShowDetailModal(true);
+      } else {
+        toast.error('Failed to load application details');
+        // Fallback to using the application object from list
+        setSelectedApplication(application);
+        setShowDetailModal(true);
+      }
+    } catch (error) {
+      console.error('Error fetching application details:', error);
+      toast.error('Failed to load application details. Showing limited information.');
+      // Fallback to using the application object from list
+      setSelectedApplication(application);
+      setShowDetailModal(true);
+    }
   };
 
   const getStatusColor = (status) => {
@@ -783,7 +800,7 @@ const UserFormLoanDetail = () => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Submitted Date
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
                     Actions
                   </th>
                 </tr>
@@ -820,9 +837,9 @@ const UserFormLoanDetail = () => {
                     <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
                       <button
                         onClick={() => handleViewDetails(app)}
-                        className="text-orange-600 hover:text-orange-900 flex items-center"
+                        className="px-3 py-1.5 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-md font-medium transition-colors flex items-center gap-2"
                       >
-                        <EyeIcon className="h-5 w-5 mr-1" />
+                        <EyeIcon className="h-4 w-4" />
                         View Details
                       </button>
                     </td>
@@ -1014,17 +1031,64 @@ const UserFormLoanDetail = () => {
                   <div className="border border-gray-200 rounded-lg p-4 mb-4">
                     <div className="flex items-center mb-4">
                       <DocumentTextIcon className="h-5 w-5 text-orange-500 mr-2" />
-                      <h4 className="text-lg font-semibold text-gray-900">Additional Form Data</h4>
+                      <h4 className="text-lg font-semibold text-gray-900">
+                        Additional Form Data ({Object.keys(selectedApplication.dynamicFields).length} fields)
+                      </h4>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {Object.entries(selectedApplication.dynamicFields).map(([key, value]) => (
-                        <div key={key}>
-                          <p className="text-sm font-medium text-gray-500">{key}</p>
-                          <p className="text-sm text-gray-900">
-                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                          </p>
-                        </div>
-                      ))}
+                      {Object.entries(selectedApplication.dynamicFields).map(([key, value]) => {
+                        // Handle different value types
+                        let displayValue = value;
+                        let isFileUrl = false;
+                        
+                        if (typeof value === 'object' && value !== null) {
+                          // If it's an array of file objects
+                          if (Array.isArray(value) && value.length > 0 && value[0]?.url) {
+                            displayValue = `${value.length} file(s)`;
+                            isFileUrl = true;
+                          } else {
+                            displayValue = JSON.stringify(value, null, 2);
+                          }
+                        } else if (typeof value === 'string' && (value.startsWith('/uploads/') || value.startsWith('http'))) {
+                          isFileUrl = true;
+                        }
+                        
+                        return (
+                          <div key={key} className="border border-gray-100 rounded p-3 bg-white">
+                            <p className="text-sm font-medium text-gray-500 mb-1">{key}</p>
+                            {isFileUrl ? (
+                              <div className="space-y-1">
+                                {Array.isArray(value) ? (
+                                  value.map((file, idx) => (
+                                    <a
+                                      key={idx}
+                                      href={getDocumentUrl(file.url || file)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="block text-sm text-orange-600 hover:text-orange-800 underline"
+                                    >
+                                      {file.name || `File ${idx + 1}`}
+                                    </a>
+                                  ))
+                                ) : (
+                                  <a
+                                    href={getDocumentUrl(value)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-orange-600 hover:text-orange-800 underline"
+                                  >
+                                    View File
+                                  </a>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-900 break-words whitespace-pre-wrap">
+                                {String(displayValue)}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1232,23 +1296,34 @@ const UserFormLoanDetail = () => {
               </div>
 
               {/* Documents */}
-              {selectedApplication.documents && selectedApplication.documents.length > 0 && (
+              {(!selectedApplication.documents || selectedApplication.documents.length === 0) ? (
                 <div className="border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center mb-4">
                     <DocumentArrowUpIcon className="h-5 w-5 text-orange-500 mr-2" />
                     <h4 className="text-lg font-semibold text-gray-900">Documents</h4>
                   </div>
+                  <p className="text-sm text-gray-500 text-center py-4">No documents uploaded for this application.</p>
+                </div>
+              ) : (
+                <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center mb-4">
+                    <DocumentArrowUpIcon className="h-5 w-5 text-orange-500 mr-2" />
+                    <h4 className="text-lg font-semibold text-gray-900">
+                      Documents ({selectedApplication.documents.length})
+                    </h4>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {selectedApplication.documents.map((doc, index) => {
                       const docUrl = getDocumentUrl(doc.url);
+                      const isPdf = doc.name?.toLowerCase().endsWith('.pdf') || doc.url?.toLowerCase().includes('.pdf');
                       return (
-                        <div key={index} className="border border-gray-200 rounded p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">{doc.type}</p>
-                              <p className="text-xs text-gray-500">{doc.name}</p>
+                        <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-900">{doc.type}</p>
+                              <p className="text-xs text-gray-500 mt-1 break-words">{doc.name}</p>
                             </div>
-                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ml-2 ${
                               doc.status === 'Verified' 
                                 ? 'bg-green-100 text-green-800' 
                                 : doc.status === 'Rejected'
@@ -1258,15 +1333,27 @@ const UserFormLoanDetail = () => {
                               {doc.status || 'Pending'}
                             </span>
                           </div>
-                          {docUrl && (
-                            <a
-                              href={docUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-orange-600 hover:text-orange-800 underline"
-                            >
-                              View Document
-                            </a>
+                          {docUrl ? (
+                            <div className="flex gap-2">
+                              <a
+                                href={docUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex-1 text-center px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors"
+                              >
+                                {isPdf ? 'View PDF' : 'View Document'}
+                              </a>
+                              <a
+                                href={docUrl}
+                                download
+                                className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors"
+                                title="Download"
+                              >
+                                ⬇
+                              </a>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-red-500">Document URL not available</p>
                           )}
                         </div>
                       );

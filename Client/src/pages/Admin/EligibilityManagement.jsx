@@ -29,10 +29,14 @@ const EligibilityManagement = () => {
     try {
       setLoading(true);
       const response = await api.get('/eligibility');
-      setEligibilities(response.data.data || []);
+      console.log('Fetched eligibilities:', response.data);
+      const eligibilities = response.data.data || [];
+      console.log('Setting eligibilities:', eligibilities.length, 'records');
+      setEligibilities(eligibilities);
     } catch (error) {
       toast.error('Failed to fetch eligibility submissions');
       console.error('Error fetching eligibilities:', error);
+      console.error('Error response:', error.response?.data);
     } finally {
       setLoading(false);
     }
@@ -45,21 +49,40 @@ const EligibilityManagement = () => {
     }
     
     try {
+      console.log('Approving eligibility:', id);
       const response = await api.put(`/eligibility/${id}/approve`);
-      if (response.data.success) {
+      
+      console.log('Approve response:', response.data);
+      
+      if (response.data && response.data.success) {
         toast.success('Eligibility approved successfully');
-        fetchEligibilities();
+        
+        // Update the local state immediately for instant UI feedback
+        setEligibilities(prevEligibilities => 
+          prevEligibilities.map(elig => 
+            elig._id === id 
+              ? { ...elig, status: 'approved' }
+              : elig
+          )
+        );
+        
+        // Close modal if this eligibility is selected
         if (selectedEligibility?._id === id) {
-          setShowDetailModal(false);
-          setSelectedEligibility(null);
+          setSelectedEligibility({ ...selectedEligibility, status: 'approved' });
         }
+        
+        // Refresh the list to ensure consistency
+        fetchEligibilities();
       } else {
-        toast.error(response.data.message || 'Failed to approve eligibility');
+        const errorMsg = response.data?.message || 'Failed to approve eligibility';
+        console.error('Approve failed:', errorMsg);
+        toast.error(errorMsg);
       }
     } catch (error) {
       console.error('Approve error:', error);
-      console.error('Error response:', error.response);
-      toast.error(error.response?.data?.message || error.message || 'Failed to approve eligibility');
+      console.error('Error response:', error.response?.data);
+      const errorMsg = error.response?.data?.message || error.message || 'Failed to approve eligibility';
+      toast.error(errorMsg);
     }
   };
 

@@ -11,6 +11,7 @@ import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
 import ForgotPassword from './pages/Auth/ForgotPassword';
 import Dashboard from './pages/Dashboard/Dashboard';
+import ApplicationDetails from './pages/Dashboard/ApplicationDetails';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import LoansPage from './pages/Loans/LoansPage';
 import LoanDetail from './pages/Loans/LoanDetail';
@@ -140,6 +141,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/applications/:id"
+              element={
+                <ProtectedRoute>
+                  <ApplicationDetails />
                 </ProtectedRoute>
               }
             />

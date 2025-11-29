@@ -459,13 +459,149 @@ const ApplyLoan = () => {
     
     setLoading(true);
     try {
+      // Extract loanAmount and loanTenure from dynamicFields
+      // Look for common field names that might represent loan amount and tenure
+      const loanDetailsToSend = { ...formData.loanDetails };
+      
+      // Get all dynamic fields in the loanDetails section
+      const loanDetailsFields = dynamicFields.filter(f => f.section === 'loanDetails');
+      
+      loanDetailsFields.forEach(field => {
+        const fieldValue = formData.dynamicFields[field.name];
+        const fieldNameLower = (field.name || '').toLowerCase();
+        const fieldLabelLower = (field.label || '').toLowerCase();
+        
+        // Try to match loan amount fields
+        if (!loanDetailsToSend.loanAmount || loanDetailsToSend.loanAmount === '') {
+          if (
+            fieldNameLower.includes('loanamount') || 
+            fieldNameLower.includes('loan amount') ||
+            fieldNameLower.includes('amount') ||
+            fieldLabelLower.includes('loan amount') ||
+            fieldLabelLower.includes('amount')
+          ) {
+            if (fieldValue && fieldValue !== '') {
+              loanDetailsToSend.loanAmount = fieldValue;
+            }
+          }
+        }
+        
+        // Try to match loan tenure fields
+        if (!loanDetailsToSend.loanTenure || loanDetailsToSend.loanTenure === '') {
+          if (
+            fieldNameLower.includes('loantenure') || 
+            fieldNameLower.includes('loan tenure') ||
+            fieldNameLower.includes('tenure') ||
+            fieldLabelLower.includes('loan tenure') ||
+            fieldLabelLower.includes('tenure')
+          ) {
+            if (fieldValue && fieldValue !== '') {
+              loanDetailsToSend.loanTenure = fieldValue;
+            }
+          }
+        }
+      });
+      
+      // Validate that we have loanAmount and loanTenure
+      if (!loanDetailsToSend.loanAmount || loanDetailsToSend.loanAmount === '') {
+        toast.error('Please enter a valid loan amount');
+        setLoading(false);
+        return;
+      }
+      
+      if (!loanDetailsToSend.loanTenure || loanDetailsToSend.loanTenure === '') {
+        toast.error('Please enter a valid loan tenure');
+        setLoading(false);
+        return;
+      }
+      
+      // Ensure loanAmount and loanTenure are numbers
+      loanDetailsToSend.loanAmount = Number(loanDetailsToSend.loanAmount);
+      loanDetailsToSend.loanTenure = Number(loanDetailsToSend.loanTenure);
+      
+      if (isNaN(loanDetailsToSend.loanAmount) || loanDetailsToSend.loanAmount <= 0) {
+        toast.error('Loan amount must be a valid positive number');
+        setLoading(false);
+        return;
+      }
+      
+      if (isNaN(loanDetailsToSend.loanTenure) || loanDetailsToSend.loanTenure <= 0) {
+        toast.error('Loan tenure must be a valid positive number');
+        setLoading(false);
+        return;
+      }
+      
+      // Extract and validate employmentInfo
+      const employmentInfoToSend = { ...formData.employmentInfo };
+      
+      // Get all dynamic fields in the employment section
+      const employmentFields = dynamicFields.filter(f => f.section === 'employment');
+      
+      employmentFields.forEach(field => {
+        const fieldValue = formData.dynamicFields[field.name];
+        const fieldNameLower = (field.name || '').toLowerCase();
+        const fieldLabelLower = (field.label || '').toLowerCase();
+        
+        // Try to match employment type fields
+        if (!employmentInfoToSend.employmentType || employmentInfoToSend.employmentType === '') {
+          if (
+            fieldNameLower.includes('employmenttype') || 
+            fieldNameLower.includes('employment type') ||
+            fieldNameLower.includes('employment') ||
+            fieldLabelLower.includes('employment type') ||
+            fieldLabelLower.includes('employment')
+          ) {
+            if (fieldValue && fieldValue !== '') {
+              employmentInfoToSend.employmentType = fieldValue;
+            }
+          }
+        }
+        
+        // Try to match monthly income fields
+        if (!employmentInfoToSend.monthlyIncome || employmentInfoToSend.monthlyIncome === '') {
+          if (
+            fieldNameLower.includes('monthlyincome') || 
+            fieldNameLower.includes('monthly income') ||
+            fieldNameLower.includes('income') ||
+            fieldLabelLower.includes('monthly income') ||
+            fieldLabelLower.includes('income')
+          ) {
+            if (fieldValue && fieldValue !== '') {
+              employmentInfoToSend.monthlyIncome = fieldValue;
+            }
+          }
+        }
+      });
+      
+      // Validate employmentType
+      if (!employmentInfoToSend.employmentType || employmentInfoToSend.employmentType === '') {
+        toast.error('Please select an employment type');
+        setLoading(false);
+        return;
+      }
+      
+      // Validate and convert monthlyIncome to Number
+      if (!employmentInfoToSend.monthlyIncome || employmentInfoToSend.monthlyIncome === '') {
+        toast.error('Please enter your monthly income');
+        setLoading(false);
+        return;
+      }
+      
+      employmentInfoToSend.monthlyIncome = Number(employmentInfoToSend.monthlyIncome);
+      
+      if (isNaN(employmentInfoToSend.monthlyIncome) || employmentInfoToSend.monthlyIncome <= 0) {
+        toast.error('Monthly income must be a valid positive number');
+        setLoading(false);
+        return;
+      }
+      
       const formDataToSend = new FormData();
       
       formDataToSend.append('loanId', formData.loanId);
       formDataToSend.append('personalInfo', JSON.stringify(formData.personalInfo));
       formDataToSend.append('address', JSON.stringify(formData.address));
-      formDataToSend.append('employmentInfo', JSON.stringify(formData.employmentInfo));
-      formDataToSend.append('loanDetails', JSON.stringify(formData.loanDetails));
+      formDataToSend.append('employmentInfo', JSON.stringify(employmentInfoToSend));
+      formDataToSend.append('loanDetails', JSON.stringify(loanDetailsToSend));
 
       // Append static document files
       Object.keys(formData.documents).forEach(docType => {
@@ -801,6 +937,53 @@ const ApplyLoan = () => {
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 gap-6">
+                    {/* Static Employment Type Field */}
+                    <div className="md:col-span-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Employment Type <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        required
+                        value={formData.employmentInfo.employmentType}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          employmentInfo: {
+                            ...formData.employmentInfo,
+                            employmentType: e.target.value
+                          }
+                        })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">Select Employment Type</option>
+                        <option value="Salaried">Salaried</option>
+                        <option value="Self-Employed">Self-Employed</option>
+                        <option value="Business">Business</option>
+                      </select>
+                    </div>
+                    
+                    {/* Static Monthly Income Field */}
+                    <div className="md:col-span-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Monthly Income (₹) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        value={formData.employmentInfo.monthlyIncome}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          employmentInfo: {
+                            ...formData.employmentInfo,
+                            monthlyIncome: e.target.value
+                          }
+                        })}
+                        min="0"
+                        placeholder="Enter your monthly income"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    
+                    {/* Dynamic Employment Fields */}
                     {(() => {
                       const employmentFields = dynamicFields
                         .filter(f => f.section === 'employment')
@@ -820,11 +1003,6 @@ const ApplyLoan = () => {
                           {renderDynamicField(field)}
                         </div>
                       ))}
-                    {dynamicFields.filter(f => f.section === 'employment').length === 0 && (
-                      <div className="md:col-span-2 text-center py-8 text-gray-500">
-                        <p>No employment fields configured for this loan category.</p>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -862,6 +1040,53 @@ const ApplyLoan = () => {
                   </div>
                 ) : (
                   <div className="grid md:grid-cols-2 gap-6">
+                    {/* Static Loan Amount Field */}
+                    <div className="md:col-span-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Loan Amount (₹) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        value={formData.loanDetails.loanAmount}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          loanDetails: {
+                            ...formData.loanDetails,
+                            loanAmount: e.target.value
+                          }
+                        })}
+                        min={selectedLoan?.minLoanAmount || 0}
+                        max={selectedLoan?.maxLoanAmount || undefined}
+                        placeholder={`Enter loan amount (₹${selectedLoan?.minLoanAmount?.toLocaleString() || '0'} - ₹${selectedLoan?.maxLoanAmount?.toLocaleString() || '0'})`}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    
+                    {/* Static Loan Tenure Field */}
+                    <div className="md:col-span-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Loan Tenure (Months) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        value={formData.loanDetails.loanTenure}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          loanDetails: {
+                            ...formData.loanDetails,
+                            loanTenure: e.target.value
+                          }
+                        })}
+                        min={selectedLoan?.minTenure || 0}
+                        max={selectedLoan?.maxTenure || undefined}
+                        placeholder={`Enter tenure (${selectedLoan?.minTenure || 0} - ${selectedLoan?.maxTenure || 0} months)`}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                    
+                    {/* Dynamic Fields */}
                     {(() => {
                       const loanDetailsFields = dynamicFields
                         .filter(f => f.section === 'loanDetails')
@@ -881,11 +1106,6 @@ const ApplyLoan = () => {
                           {renderDynamicField(field)}
                         </div>
                       ))}
-                    {dynamicFields.filter(f => f.section === 'loanDetails').length === 0 && (
-                      <div className="md:col-span-2 text-center py-8 text-gray-500">
-                        <p>No loan details fields configured for this loan category.</p>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
